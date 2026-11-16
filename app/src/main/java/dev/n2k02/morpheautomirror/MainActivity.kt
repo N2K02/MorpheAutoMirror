@@ -32,8 +32,6 @@ import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.DirectionsCar
 import androidx.compose.material.icons.rounded.Home
-import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.List
 import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.PowerSettingsNew
 import androidx.compose.material.icons.rounded.Settings
@@ -41,6 +39,7 @@ import androidx.compose.material.icons.rounded.Update
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -67,6 +66,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.shape.RoundedCornerShape
+import android.os.SystemClock
+import kotlinx.coroutines.delay
 import androidx.core.content.ContextCompat
 import dev.n2k02.theme.N2K02Theme
 import dev.n2k02.updater.N2K02UpdateScreen
@@ -102,8 +104,17 @@ class MainActivity : ComponentActivity() {
         val s by MirrorGateway.state.collectAsState()
         val available by MirrorGateway.carAvailable.collectAsState()
         val error by MirrorGateway.lastError.collectAsState()
-        val lines by AppLog.lines.collectAsState()
         val experimental by LiveUpdater.experimentalEnabled.collectAsState()
+        val listenerStarted by MirrorGateway.listenerConnectedAt.collectAsState()
+        val carStarted by MirrorGateway.carConnectedAt.collectAsState()
+        val sessionFound by MirrorGateway.mediaSessionActive.collectAsState()
+        var uptimeNow by remember { mutableStateOf(SystemClock.elapsedRealtime()) }
+        LaunchedEffect(page) {
+            while (page == "Home") {
+                uptimeNow = SystemClock.elapsedRealtime()
+                delay(1000)
+            }
+        }
         var page by rememberSaveable { mutableStateOf("Home") }
         BackHandler(enabled = page != "Home") { page = PageNavigation.parent(page) }
         var monitoring by remember { mutableStateOf(MirrorGateway.prefs.enabled) }
@@ -154,7 +165,6 @@ class MainActivity : ComponentActivity() {
                     }
                     val icon = when (page) {
                         "Home" -> Icons.Rounded.Home
-                        "Logs" -> Icons.Rounded.List
                         "Updates" -> Icons.Rounded.Update
                         "Monitoring" -> Icons.Rounded.NotificationsActive
                         "Rendering" -> Icons.Rounded.Tune
@@ -183,36 +193,93 @@ class MainActivity : ComponentActivity() {
                 .padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 when (page) {
                     "Home" -> {
-                        Card(Modifier.fillMaxWidth()) {
-                            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text("Live status", style = MaterialTheme.typography.titleLarge)
-                                StatusLine("Morphe video session", if (s.morphePlaying) "Playing" else "Inactive")
-                                StatusLine("Android Auto connection", if (available) "Connected" else "Not connected")
-                                StatusLine("Car app surface", if (s.surfaceReady) "Ready" else "Open app on Android Auto")
-                                StatusLine("Mirroring", if (s.capturing) "Active" else next.toString().replace('_', ' '))
+                        Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+                            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Icon(Icons.Rounded.DirectionsCar, contentDescription = null,
+                                        modifier = Modifier.size(30.dp))
+                                    Text("Morphe Auto Mirror", style = MaterialTheme.typography.titleLarge,
+                                        modifier = Modifier.weight(1f))
+                                    HomeBadge(if (s.capturing) "MIRRORING" else "STANDBY", s.capturing)
+                                }
+                                Text("Play in YouTube Morphe, then open the app on Android Auto while parked.",
+                                    style = MaterialTheme.typography.bodyMedium)
                             }
                         }
-                        if (error.isNotEmpty()) Text(error, color = MaterialTheme.colorScheme.error)
                         Card(Modifier.fillMaxWidth()) {
                             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Text("Parked-only video", style = MaterialTheme.typography.titleMedium)
-                                Text("Open Morphe and play a video. On Android Auto, open MorpheAutoMirror. Capture consent is required for every session.")
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Rounded.NotificationsActive, contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary)
+                                    Text("Morphe listener", style = MaterialTheme.typography.titleMedium,
+                                        modifier = Modifier.weight(1f).padding(start = 10.dp))
+                                    HomeBadge(if (listenerStarted != null && s.monitoring) "CONNECTED" else "OFFLINE",
+                                        listenerStarted != null && s.monitoring)
+                                }
+                                HomeStatusRow("Monitoring", if (s.monitoring) "Enabled" else "Disabled")
+                                HomeStatusRow("Connected for",
+                                    if (s.monitoring) ListenerUptime.format(listenerStarted, uptimeNow) else "Not monitoring")
+                                HomeStatusRow("Media session", if (sessionFound) "Detected" else "Not detected")
+                                HomeStatusRow("Playback", if (s.morphePlaying) "Playing" else "Idle")
+                                if (listenerStarted == null && s.monitoring) {
+                                    Button(onClick = {
+                                        startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                                    }, modifier = Modifier.fillMaxWidth()) { Text("Grant notification access") }
+                                }
+                            }
+                        }
+                        Card(Modifier.fillMaxWidth()) {
+                            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Rounded.DirectionsCar, contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary)
+                                    Text("Android Auto", style = MaterialTheme.typography.titleMedium,
+                                        modifier = Modifier.weight(1f).padding(start = 10.dp))
+                                    HomeBadge(if (available) "CONNECTED" else "DISCONNECTED", available)
+                                }
+                                HomeStatusRow("Connection time", ListenerUptime.format(carStarted, uptimeNow))
+                                HomeStatusRow("Car app", if (s.carSession) "Open" else "Not open")
+                                HomeStatusRow("Display surface", if (s.surfaceReady) "Ready" else "Waiting")
+                            }
+                        }
+                        Card(Modifier.fillMaxWidth()) {
+                            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Rounded.PlayCircle, contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary)
+                                    Text("Video mirroring", style = MaterialTheme.typography.titleMedium,
+                                        modifier = Modifier.weight(1f).padding(start = 10.dp))
+                                    HomeBadge(if (s.capturing) "ACTIVE" else "INACTIVE", s.capturing)
+                                }
+                                HomeStatusRow("Renderer",
+                                    if (webView) "WebView (experimental)" else "Direct surface")
+                                HomeStatusRow("Capture", if (s.permissionGranted) "Granted" else "Not granted")
                                 if (!s.parkedConfirmed) {
                                     Button(onClick = { MirrorGateway.parked(true) },
-                                        enabled = s.carSession && s.morphePlaying) {
+                                        enabled = available && s.carSession && s.surfaceReady && s.morphePlaying,
+                                        modifier = Modifier.fillMaxWidth()) {
                                         Text("Confirm parked & mirror")
                                     }
                                 } else {
-                                    Button(onClick = { MirrorGateway.parked(false); MirrorGateway.stopCapture() }) {
-                                        Text("Stop mirroring")
-                                    }
+                                    Button(onClick = {
+                                        MirrorGateway.parked(false)
+                                        MirrorGateway.stopCapture()
+                                    }, modifier = Modifier.fillMaxWidth()) { Text("Stop mirroring") }
                                 }
-                                Text("Audio continues through Morphe. Secure videos may appear black.",
+                                Text("Capture permission is required per session. Audio stays in Morphe.",
                                     style = MaterialTheme.typography.bodySmall)
                             }
                         }
-                        Button(onClick = { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }) {
-                            Text("Grant notification access")
+                        if (error.isNotBlank()) {
+                            Card(Modifier.fillMaxWidth()) {
+                                Column(Modifier.padding(16.dp)) {
+                                    Text("Capture issue", style = MaterialTheme.typography.titleSmall,
+                                        color = MaterialTheme.colorScheme.error)
+                                    Text(error, style = MaterialTheme.typography.bodyMedium)
+                                }
+                            }
                         }
                     }
                     "Settings" -> {
@@ -233,15 +300,7 @@ class MainActivity : ComponentActivity() {
                             modifier = Modifier.fillMaxWidth().clickable { page = "Rendering" }
                         )
                         HorizontalDivider()
-                        Text("Diagnostics & updates", style = MaterialTheme.typography.titleMedium)
-                        ListItem(
-                            headlineContent = { Text("Logs") },
-                            supportingContent = { Text("View, copy and share diagnostics") },
-                            leadingContent = { Icon(Icons.Rounded.List, null) },
-                            trailingContent = { Icon(Icons.Rounded.ChevronRight, null) },
-                            modifier = Modifier.fillMaxWidth().clickable { page = "Logs" }
-                        )
-                        HorizontalDivider()
+                        Text("Updates", style = MaterialTheme.typography.titleMedium)
                         ListItem(
                             headlineContent = { Text("Updates") },
                             supportingContent = { Text("Stable and experimental releases") },
@@ -283,29 +342,6 @@ class MainActivity : ComponentActivity() {
                         Text("Video capture requires permission for each session. Mirroring is parked-only.",
                             style = MaterialTheme.typography.bodySmall)
                     }
-                    "Logs" -> {
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Button(onClick = {
-                                val clipboard = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                clipboard.setPrimaryClip(android.content.ClipData.newPlainText(
-                                    "MorpheAutoMirror logs", lines.joinToString("\n")))
-                            }) { Text("Copy") }
-                            Button(onClick = {
-                                val share = Intent(Intent.ACTION_SEND).apply {
-                                    type = "text/plain"
-                                    putExtra(Intent.EXTRA_TEXT, lines.joinToString("\n"))
-                                }
-                                startActivity(Intent.createChooser(share, "Share logs"))
-                            }) { Text("Share") }
-                            Button(onClick = AppLog::clear) { Text("Clear") }
-                        }
-                        var filter by remember { mutableStateOf("") }
-                        OutlinedTextField(value = filter, onValueChange = { filter = it },
-                            label = { Text("Filter logs") }, modifier = Modifier.fillMaxWidth())
-                        Text((if (filter.isBlank()) lines else lines.filter { it.contains(filter, true) })
-                            .joinToString("\n").ifBlank { "No log events" },
-                            style = MaterialTheme.typography.bodySmall)
-                    }
                     "Updates" -> {
                         N2K02UpdateScreen(
                             controller = LiveUpdater.controller,
@@ -321,10 +357,24 @@ class MainActivity : ComponentActivity() {
     }
 }
 @Composable
-private fun StatusLine(label: String, value: String) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, style = MaterialTheme.typography.bodyMedium)
-        Text(value, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+private fun HomeStatusRow(label: String, value: String) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f))
+        Text(value, style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.SemiBold)
     }
 }
 
+@Composable
+private fun HomeBadge(label: String, active: Boolean) {
+    Surface(shape = RoundedCornerShape(50),
+        color = if (active) MaterialTheme.colorScheme.tertiaryContainer
+            else MaterialTheme.colorScheme.surfaceVariant) {
+        Text(label, modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = if (active) MaterialTheme.colorScheme.onTertiaryContainer
+                else MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
