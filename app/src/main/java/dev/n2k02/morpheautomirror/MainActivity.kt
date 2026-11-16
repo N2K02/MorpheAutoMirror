@@ -278,12 +278,6 @@ class MainActivity : ComponentActivity() {
                                 HomeStatusRow("Renderer",
                                     if (geckoView) "GeckoView (experimental)" else "Direct surface")
                                 HomeStatusRow("Capture", if (s.permissionGranted) "Granted" else "Not granted")
-                                if (!s.parkedConfirmed) {
-                                    Button(onClick = { MirrorGateway.parked(true) },
-                                        enabled = available && s.carSession && s.surfaceReady && s.morphePlaying,
-                                        modifier = Modifier.fillMaxWidth()) {
-                                        Text("Confirm parked & mirror")
-                                    }
                                 } else {
                                     Button(onClick = {
                                         MirrorGateway.parked(false)
