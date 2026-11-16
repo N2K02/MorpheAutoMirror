@@ -56,7 +56,7 @@ internal object MirrorGateway {
         sync()
     }
     fun carSession(value: Boolean) {
-        state.update { it.copy(carSession = value, parkedConfirmed = if (value) it.parkedConfirmed else false) }
+        state.update { it.copy(carSession = value) }
         if (!value) {
             surface.value = null
             state.update { it.copy(surfaceReady = false) }
@@ -65,7 +65,7 @@ internal object MirrorGateway {
         sync()
     }
     fun parked(value: Boolean) {
-        state.update { it.copy(parkedConfirmed = value) }
+        // Legacy callers retained; parked confirmation is no longer part of MirrorState.
         AppLog.add("SAFE", "Parked confirmation=$value")
         sync()
     }
