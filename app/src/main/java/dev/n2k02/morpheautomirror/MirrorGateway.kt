@@ -36,6 +36,7 @@ internal object MirrorGateway {
         private set
     private var context: Context? = null
     private var permissionNotificationShown = false
+    private var scrcpyStartRequested = false
 
     fun init(ctx: Context) {
         if (context == null) {
@@ -102,9 +103,14 @@ internal object MirrorGateway {
             AppLog.add("CAPTURE", message)
         }
         state.update { it.copy(permissionGranted = false, capturing = false) }
+        scrcpyStartRequested = false
     }
     fun stopCapture() {
-        context?.let { MirrorForegroundService.stop(it) }
+        context?.let {
+            MirrorForegroundService.stop(it)
+            ScrcpyMirrorService.stop(it)
+        }
+        scrcpyStartRequested = false
         state.update { it.copy(permissionGranted = false, capturing = false) }
     }
     fun quit() {
@@ -130,9 +136,26 @@ internal object MirrorGateway {
                 stopCapture()
                 permissionNotificationShown = false
             }
-            NextStep.ASK_PERMISSION -> if (!permissionNotificationShown) {
-                permissionNotificationShown = true
-                askByNotification(ctx)
+            NextStep.ASK_PERMISSION -> {
+                if (ShizukuAccess.status.value.readyForShell) {
+                    if (!scrcpyStartRequested) {
+                        scrcpyStartRequested = true
+                        try {
+                            ScrcpyMirrorService.start(ctx)
+                            AppLog.add("SCRCPY", "Requested shell-backed video mirror")
+                        } catch (e: Exception) {
+                            scrcpyStartRequested = false
+                            AppLog.add("SCRCPY", "Automatic foreground start denied: ${e.javaClass.simpleName}")
+                            if (!permissionNotificationShown) {
+                                permissionNotificationShown = true
+                                askByNotification(ctx)
+                            }
+                        }
+                    }
+                } else if (!permissionNotificationShown) {
+                    permissionNotificationShown = true
+                    askByNotification(ctx)
+                }
             }
             else -> {
                 permissionNotificationShown = false
