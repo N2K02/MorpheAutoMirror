@@ -24,7 +24,7 @@ internal class FrameCaptureServer : AutoCloseable {
     private val frameThread = HandlerThread("morphe-frames").apply { start() }
     private val imageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2)
     val inputSurface: Surface get() = imageReader.surface
-    private val socket = ServerSocket(0, 1, InetAddress.getLoopbackAddress())
+    private val socket = ServerSocket(0, 1, InetAddress.getByName("127.0.0.1"))
     val port: Int = socket.localPort
     @Volatile private var latestFrame: ByteArray? = null
     private var lastFrameAt = 0L
