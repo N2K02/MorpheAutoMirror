@@ -24,8 +24,24 @@ class EnginePolicyTest {
     @Test fun startWhenAllConditionsMet() = assertEquals(NextStep.MIRROR,
         EnginePolicy.plan(MirrorState(morphePlaying = true, carSession = true,
             parkedConfirmed = true, surfaceReady = true, permissionGranted = true)))
-    @Test fun pauseStopsCapture() = assertEquals(NextStep.STOP,
-        EnginePolicy.plan(MirrorState(morphePlaying = false, capturing = true)))
+    @Test fun pauseKeepsActiveCaptureWithoutRestartOrNewConsent() = assertEquals(NextStep.MIRROR,
+        EnginePolicy.plan(MirrorState(morphePlaying = false, morphePaused = true, capturing = true,
+            carSession = true, parkedConfirmed = true, surfaceReady = true, permissionGranted = true)))
+    @Test fun pausedBeforeCaptureDoesNotStartProjection() = assertEquals(NextStep.IDLE,
+        EnginePolicy.plan(MirrorState(morphePaused = true, carSession = true,
+            parkedConfirmed = true, surfaceReady = true)))
+    @Test fun stoppedPlaybackEndsActiveCapture() = assertEquals(NextStep.STOP,
+        EnginePolicy.plan(MirrorState(morphePlaying = false, morphePaused = false,
+            capturing = true, carSession = true, parkedConfirmed = true,
+            surfaceReady = true, permissionGranted = true)))
+    @Test fun pausedCaptureStopsWhenCarDisconnects() = assertEquals(NextStep.STOP,
+        EnginePolicy.plan(MirrorState(morphePaused = true, capturing = true,
+            carSession = false, parkedConfirmed = true, surfaceReady = true,
+            permissionGranted = true)))
+    @Test fun pausedCaptureStopsWhenParkedApprovalRevoked() = assertEquals(NextStep.STOP,
+        EnginePolicy.plan(MirrorState(morphePaused = true, capturing = true,
+            carSession = true, parkedConfirmed = false, surfaceReady = true,
+            permissionGranted = true)))
     @Test fun carDisconnectStopsCapture() = assertEquals(NextStep.STOP,
         EnginePolicy.plan(MirrorState(morphePlaying = true, capturing = true, carSession = false)))
     @Test fun carParkedRevokeStopsCapture() = assertEquals(NextStep.STOP,
