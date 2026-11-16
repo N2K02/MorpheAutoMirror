@@ -6,6 +6,7 @@ internal data class MirrorState(
     val morphePlaying: Boolean = false,
     val morphePaused: Boolean = false,
     val carSession: Boolean = false,
+    val parkedConfirmed: Boolean = false,
     val permissionGranted: Boolean = false,
     val surfaceReady: Boolean = false,
     val capturing: Boolean = false,
@@ -18,6 +19,7 @@ internal object EnginePolicy {
         !s.monitoring || (!s.morphePlaying && !(s.capturing && s.morphePaused)) ->
             if (s.capturing) NextStep.STOP else NextStep.IDLE
         !s.carSession -> if (s.capturing) NextStep.STOP else NextStep.WAIT_FOR_CAR
+        !s.parkedConfirmed -> if (s.capturing) NextStep.STOP else NextStep.WAIT_FOR_PARKED
         !s.surfaceReady -> if (s.capturing) NextStep.STOP else NextStep.WAIT_FOR_SURFACE
         !s.permissionGranted -> NextStep.ASK_PERMISSION
         else -> NextStep.MIRROR
