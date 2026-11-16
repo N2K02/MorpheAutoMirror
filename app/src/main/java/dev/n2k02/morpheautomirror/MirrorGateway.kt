@@ -40,7 +40,10 @@ internal object MirrorGateway {
     }
     fun carSession(value: Boolean) {
         state.update { it.copy(carSession = value, parkedConfirmed = if (value) it.parkedConfirmed else false) }
-        if (!value) surface.value = null
+        if (!value) {
+            surface.value = null
+            state.update { it.copy(surfaceReady = false) }
+        }
         AppLog.add("CAR", "Car app session active=$value")
         sync()
     }
@@ -66,7 +69,10 @@ internal object MirrorGateway {
         MorpheNotificationListener.updateEnabled(value)
         val app = context as? MorpheApplication
         if (value) app?.startConnectionMonitoring() else app?.stopConnectionMonitoring()
-        if (!value) playing(false) else sync()
+        if (!value) {
+            parked(false)
+            playing(false)
+        } else sync()
     }
     fun captureStarted() {
         permissionNotificationShown = false
