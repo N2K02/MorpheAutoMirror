@@ -24,11 +24,13 @@ Video **never bypasses DRM**: secure/protected frames may be black. Never intera
 
 ## Signing and releases
 
-Tests run on every PR and main commit. One reusable experimental PR is used per app. Signed experimental prereleases and stable GitHub Releases are published only with the four repository secrets:
+Tests run on every PR and main commit. One reusable experimental PR is used per app. Signed experimental prereleases and stable GitHub Releases currently use the four app-specific signing secrets:
 
 `SIGNING_KEYSTORE_BASE64`, `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS`, `SIGNING_KEY_PASSWORD`.
 
-The CI checks out the public shared N2K02 theme/updater and uses Gradle composite builds, so no package token is required for verification or release compilation. A `N2K02_PACKAGES_TOKEN` can be used for Maven builds instead. These credentials are read by CI only and are never checked into source. Use the same keystore for **all versions of this app** (do not inadvertently change the certificate after installing). Experimental APKs have `-experimental.<run>` version suffix; merged main creates the next numbered stable release. Review CI before merging.
+Unlike mRadio, which decrypts its tracked private signing bundle using `SIGNING_PASSPHRASE`, this new app keeps its own keystore provided through repository secrets until an app-specific encrypted bundle is prepared. Do not copy mRadio signing material without explicitly choosing shared-signature identity. 
+
+The CI checks out the public shared N2K02 theme/updater and uses Gradle composite builds, so no package token is required for verification or release compilation. A `N2K02_PACKAGES_TOKEN` can be used for Maven builds instead. These credentials are read by CI only and are never checked into source. Use the same keystore for **all versions of this app** (do not inadvertently change the certificate after installing). Release versioning now follows mRadio: experimental APKs use the next stable base with sequential `-experimental.N` naming; releases have monotonic version codes, generated changelogs, and stable versions advance by 0.1. Experimental tags remain `experimental-pr-<PR>-run-<run>`. The workflow reuses PR #1. Review CI before merging.
 
 ## Local build
 
