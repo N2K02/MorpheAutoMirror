@@ -9,8 +9,8 @@ A standalone **parked-only experimental** Android Auto companion for Morphe-patc
 3. Open Morphe YouTube and play a video.
 4. Connect Android Auto and open **MorpheAutoMirror** in its launcher (the Android Auto host cannot be forced to switch apps).
 5. Confirm the vehicle is parked, then grant screen-capture permission on the phone for that session.
-6. Video is mirrored through a direct MediaProjection → car surface; choose GeckoView experiment for the slower local MJPEG path.
-7. Notification provides Stop mirroring. Pausing, stopping Morphe, disconnecting or Quit tears down capture.
+6. Video uses one path: MediaProjection → VirtualDisplay → Android Auto Surface. There is no browser, MJPEG server, video encoder/decoder or other renderer.
+7. The notification provides Stop mirroring. Pausing Morphe keeps an existing capture alive; stopping playback, disconnecting or Quit tears it down.
 
 Video **never bypasses DRM**: secure/protected frames may be black. Never interact with video while driving. Android Auto does not provide a universal parked-state API; the required user confirmation is a safeguard, not vehicle-motion detection.
 
@@ -20,7 +20,7 @@ Video **never bypasses DRM**: secure/protected frames may be black. Never intera
 - User permission is required per MediaProjection session on Android 14+. Reconnection may require consent again.
 - Android Auto must launch this app to create the surface; Morphe playback detection itself does not launch the host screen.
 - On some head units the app may not appear even with developer options. Debug on Android Auto Desktop Head Unit first.
-- GeckoView experimental renderer is limited to 480p (or less), 5fps, JPEG compression; **direct renderer recommended**.
+- Only the direct surface renderer is supported. Frame rate and resolution depend on Android MediaProjection and the car host surface.
 - Audio stays with Morphe/Android Auto. The mirror does not capture or replay audio.
 
 ## Signing and releases
@@ -31,8 +31,17 @@ The signing configuration now matches **mRadio exactly**: the committed encrypte
 
 Monitoring uses PackageManager discovery and actual notification-listener access checks; badges refresh on returning to the app. Ordinary YouTube is never treated as Morphe. Logs remain in Android Logcat for McpAdbAndroidLogger, not an in-app Logs page.
 
-GeckoView uses the pinned Mozilla stable `org.mozilla.geckoview:geckoview:160.0.20261104181552` library, which significantly increases download and APK size. The experimental renderer uses a private session, disabled JavaScript, a TextureView on a car-directed virtual display, and a token-protected localhost-only HTML + MJPEG endpoint. It has **not** been validated on a physical Android Auto host; the direct renderer remains the default and preferred low-latency option. This is not a way to bypass Android Auto video restrictions or protected/DRM video.
+## Rendering architecture and scrcpy
 
+```
+Morphe playback state -> NotificationListenerService -> MirrorGateway
+Android Auto host -> SurfaceCallback -> Android Auto Surface
+User consent -> MediaProjection -> one VirtualDisplay -> Android Auto Surface
+```
+
+The application does **not** use the scrcpy program, ADB-shell server, socket protocol, video encoder or FFmpeg decoder. scrcpy is only a conceptual reference for low-latency capture; adding its encoded stream and decoder to the same Android device would add complexity and could increase latency. Native Android MediaProjection already supports routing pixels directly to a Surface without that extra encode/decode path. A new capture session still requires user authorization; MediaProjection may show protected video as black.
+
+```
 The CI checks out the shared N2K02 theme/updater source and uses Gradle composite builds. Releases remain unverified until a green workflow and signed APK are available. Review the experimental PR before merging.
 
 ## Local build
