@@ -99,6 +99,8 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         LiveUpdater.onResume(this)
         ShizukuAccess.refresh()
+        // Foreground launch can satisfy Android's restrictions on starting capture services.
+        MirrorGateway.sync()
         uiRefresh.value = uiRefresh.value + 1
     }
     private fun quit() {
