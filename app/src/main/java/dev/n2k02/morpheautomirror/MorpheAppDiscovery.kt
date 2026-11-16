@@ -12,7 +12,8 @@ internal object MorpheAppPolicy {
     fun eligible(name: String): Boolean {
         val packageName = name.lowercase(Locale.ROOT)
         return packageName == DEFAULT_PACKAGE ||
-            (packageName.contains("morphe") && packageName.contains("youtube"))
+            (packageName.contains("morphe") && packageName.contains("youtube") &&
+                !packageName.contains("music"))
     }
 
     fun select(installed: Collection<String>): String? =
