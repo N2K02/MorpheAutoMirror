@@ -6,5 +6,6 @@ interface IScrcpyShellService {
     void stageServer(in byte[] serverJar);
     void startServer(String scid);
     void stopServer();
-    void destroy();
+    String getLastError();
+    void destroy() = 16777114;
 }
