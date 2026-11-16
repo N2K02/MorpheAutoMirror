@@ -1,26 +1,24 @@
 # MorpheAutoMirror
 
-A standalone **parked-only experimental** Android Auto companion for Morphe-patched YouTube. A notification listener watches only the automatically detected Morphe YouTube package, checks its media session and starts a MediaProjection session after a fresh user consent. An Android Auto Car App Library session supplies a surface for mirroring.
+An experimental Android Auto companion for Morphe-patched YouTube, intended for testing while parked. A notification listener detects playback and Android Auto supplies a display Surface. It can request ordinary MediaProjection capture or try the opt-in scrcpy server via an explicitly authorized LocalAdb Shizuku Binder.
 
 ## Operation
 
-1. Install and open the application. Monitoring automatically looks for Morphe YouTube (including `app.morphe.android.youtube`) without a package-name field.
-2. Open Settings → Monitoring: verify the Morphe **Installed** badge and notification-listener **Granted** badge; use **Grant access** if needed. Enable Automatic Morphe listener.
-3. Open Morphe YouTube and play a video.
-4. Connect Android Auto and open **MorpheAutoMirror** in its launcher (the Android Auto host cannot be forced to switch apps).
-5. Confirm the vehicle is parked, then grant screen-capture permission on the phone for that session.
-6. Video uses one path: MediaProjection → VirtualDisplay → Android Auto Surface. There is no browser, MJPEG server, video encoder/decoder or other renderer.
-7. The notification provides Stop mirroring. Pausing Morphe keeps an existing capture alive; stopping playback, disconnecting or Quit tears it down.
+1. Install MorpheAutoMirror and open it once. In Settings → Monitoring verify that Morphe YouTube is detected and grant notification-listener access.
+2. Start LocalAdb, verify its embedded Shizuku manager is running, then open MorpheAutoMirror Settings → Shizuku access and explicitly grant permission. A visible Authorized (UID 2000) badge is required; merely installing LocalAdb is not enough.
+3. Connect Android Auto, open MorpheAutoMirror on the car launcher and play Morphe on the phone while parked.
+4. When the car Surface and playback are ready, authorized Shizuku enables the **experimental** scrcpy 3.3.4 server → on-device H.264 decoder → car Surface path. If Shizuku is not authorized, the previous MediaProjection → VirtualDisplay → car Surface path remains available and requires an on-phone consent prompt.
+5. A pause does not cause Morphe playback controls to fire. Disconnecting, stopping playback or Quit ends the mirroring service. Audio is not captured or duplicated.
 
-Video **never bypasses DRM**: secure/protected frames may be black. Never interact with video while driving. Android Auto does not provide a universal parked-state API; the required user confirmation is a safeguard, not vehicle-motion detection.
+Android Auto cannot be forced to foreground this app, and OEMs may reject the navigation Surface. The current car Surface integration is **not independently tested** on a physical head unit. Do not use video while driving. Neither scrcpy nor Shizuku guarantees bypass of protected-video black frames or Android Auto host restrictions.
 
 ## Constraints
 
 - Unofficial Android Auto integration uses the navigation surface privilege for personal testing. Not eligible for Play Store distribution as a video or browser app.
-- User permission is required per MediaProjection session on Android 14+. Reconnection may require consent again.
+- MediaProjection fallback requires consent for each capture session on Android 14+. scrcpy instead requires an explicit LocalAdb/Shizuku permission grant (not silent authorization).
 - Android Auto must launch this app to create the surface; Morphe playback detection itself does not launch the host screen.
 - On some head units the app may not appear even with developer options. Debug on Android Auto Desktop Head Unit first.
-- Only the direct surface renderer is supported. Frame rate and resolution depend on Android MediaProjection and the car host surface.
+- Two renderers are available: experimental scrcpy H.264 (requires authorized Shizuku shell), and a MediaProjection direct-surface fallback. scrcpy starts an upstream server on the same Android device and renders through MediaCodec to the car Surface; its extra encoding/decoding may increase latency.
 - Audio stays with Morphe/Android Auto. The mirror does not capture or replay audio.
 
 ## Signing and releases
@@ -34,12 +32,17 @@ Monitoring uses PackageManager discovery and actual notification-listener access
 ## Rendering architecture and scrcpy
 
 ```
-Morphe playback state -> NotificationListenerService -> MirrorGateway
-Android Auto host -> SurfaceCallback -> Android Auto Surface
-User consent -> MediaProjection -> one VirtualDisplay -> Android Auto Surface
+Morphe media session → NotificationListenerService → MirrorGateway
+Android Auto CarAppService → SurfaceCallback → car Surface
+LocalAdb embedded Shizuku (explicit grant, UID 2000)
+    → scrcpy 3.3.4 shell server → local abstract socket → MediaCodec H.264 → car Surface
+Fallback without Shizuku
+    → Android MediaProjection (on-phone consent) → VirtualDisplay → car Surface
 ```
 
-The application does **not** use the scrcpy program, ADB-shell server, socket protocol, video encoder or FFmpeg decoder. scrcpy is only a conceptual reference for low-latency capture; adding its encoded stream and decoder to the same Android device would add complexity and could increase latency. Native Android MediaProjection already supports routing pixels directly to a Surface without that extra encode/decode path. A new capture session still requires user authorization; MediaProjection may show protected video as black.
+The upstream scrcpy 3.3.4 server is downloaded only at build time from Genymobile's official release; `scripts/fetch-scrcpy-server.sh` verifies SHA-256 `8588238c9a5a00aa542906b6ec7e6d5541d9ffb9b5d0f6e1bc0e365e2303079e` before embedding the jar. scrcpy is Apache-2.0 licensed. The client implements only the pinned H.264/video socket protocol: audio and input injection are disabled. A server and client version mismatch is not supported.
+
+Shizuku start-up and the local abstract Unix socket may be restricted by Android/OEM SELinux policies. Failure is logged under SCRCPY and must not be presented as successful mirroring. Physical Android Auto video and LocalAdb end-to-end tests are still required.
 
 The CI checks out the shared N2K02 theme/updater source and uses Gradle composite builds. Releases remain unverified until a green workflow and signed APK are available. Review the experimental PR before merging.
 
