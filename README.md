@@ -24,13 +24,11 @@ Video **never bypasses DRM**: secure/protected frames may be black. Never intera
 
 ## Signing and releases
 
-Tests run on every PR and main commit. One reusable experimental PR is used per app. Signed experimental prereleases and stable GitHub Releases currently use the four app-specific signing secrets:
+Tests run on every PR and main commit. The single reusable experimental PR uses mRadio's experimental naming, monotonic version codes, stable +0.1 version increments, changelog generation, and GitHub Releases.
 
-`SIGNING_KEYSTORE_BASE64`, `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS`, `SIGNING_KEY_PASSWORD`.
+The signing configuration now matches **mRadio exactly**: the committed encrypted `signing/keys.tar.enc` uses `SIGNING_PASSPHRASE` in repository Actions secrets, decrypts only inside CI, and uses the same key rotation lineage to sign experimental and stable APKs. The encrypted bundle is intentionally identical to mRadio's, as requested. Add `SIGNING_PASSPHRASE` in this repository's Actions secrets; no per-app JKS secrets are required. Do not commit the passphrase or decrypted keys.
 
-Unlike mRadio, which decrypts its tracked private signing bundle using `SIGNING_PASSPHRASE`, this new app keeps its own keystore provided through repository secrets until an app-specific encrypted bundle is prepared. Do not copy mRadio signing material without explicitly choosing shared-signature identity. 
-
-The CI checks out the public shared N2K02 theme/updater and uses Gradle composite builds, so no package token is required for verification or release compilation. A `N2K02_PACKAGES_TOKEN` can be used for Maven builds instead. These credentials are read by CI only and are never checked into source. Use the same keystore for **all versions of this app** (do not inadvertently change the certificate after installing). Release versioning now follows mRadio: experimental APKs use the next stable base with sequential `-experimental.N` naming; releases have monotonic version codes, generated changelogs, and stable versions advance by 0.1. Experimental tags remain `experimental-pr-<PR>-run-<run>`. The workflow reuses PR #1. Review CI before merging.
+The CI checks out the shared N2K02 theme/updater source and uses Gradle composite builds. Releases remain unverified until a green workflow and signed APK are available. Review the experimental PR before merging.
 
 ## Local build
 
