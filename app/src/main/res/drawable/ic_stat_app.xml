@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Proper monochrome alpha-only status bar mask (never use adaptive launcher icon). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
-<path android:fillColor="#FFFFFFFF" android:pathData="M2,4h20v14H2z M4,6v10h16V6z M9,8l6,3 -6,3z M8,21h8v-2H8z"/>
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <!-- Solid white silhouette for Android notification tinting. -->
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M3,4 L21,4 Q23,4 23,6 L23,17 Q23,19 21,19 L3,19 Q1,19 1,17 L1,6 Q1,4 3,4 Z"/>
+    <path android:fillColor="#FF000000"
+        android:pathData="M4,7 L20,7 L20,16 L4,16 Z"/>
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M9,8 L9,15 L16,11.5 Z"/>
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M9,20 L15,20 L17,23 L7,23 Z"/>
 </vector>
