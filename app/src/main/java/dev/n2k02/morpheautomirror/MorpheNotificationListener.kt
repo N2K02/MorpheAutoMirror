@@ -12,6 +12,9 @@ import android.service.notification.NotificationListenerService
 class MorpheNotificationListener : NotificationListenerService() {
     companion object {
         @Volatile private var active: MorpheNotificationListener? = null
+        fun refreshPackage() {
+            active?.let { service -> service.handler.post { service.refresh() } }
+        }
         fun updateEnabled(enabled: Boolean) {
             active?.let { service ->
                 service.handler.post {
