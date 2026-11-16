@@ -16,6 +16,7 @@ class MorpheAppDiscoveryTest {
     @Test fun ignoresOfficialYouTubeAndMusic() {
         assertFalse(MorpheAppPolicy.eligible("com.google.android.youtube"))
         assertFalse(MorpheAppPolicy.eligible("app.morphe.android.music"))
+        assertFalse(MorpheAppPolicy.eligible("dev.morphe.youtube.music"))
         assertNull(MorpheAppPolicy.select(listOf("com.google.android.youtube")))
     }
     @Test fun findsDistinctMorpheVariant() {
