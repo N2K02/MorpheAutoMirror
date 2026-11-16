@@ -8,6 +8,10 @@
     <uses-permission android:name="androidx.car.app.NAVIGATION_TEMPLATES"/>
     <uses-permission android:name="androidx.car.app.ACCESS_SURFACE"/>
     <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN"/>
+            <category android:name="android.intent.category.LAUNCHER"/>
+        </intent>
         <package android:name="app.morphe.android.youtube"/>
         <package android:name="com.google.android.youtube"/>
     </queries>
