@@ -8,7 +8,7 @@ class PageNavigationTest {
         assertEquals("Home", PageNavigation.parent("Settings"))
 
     @Test fun everySettingsSubpageReturnsToSettings() {
-        listOf("Monitoring", "Updates").forEach {
+        listOf("Monitoring", "Shizuku", "Updates").forEach {
             assertEquals("Settings", PageNavigation.parent(it))
         }
     }
