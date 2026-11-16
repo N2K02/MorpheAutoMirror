@@ -10,6 +10,17 @@ import android.service.notification.NotificationListenerService
 
 /** Tracks only the selected Morphe package; no notification contents are read. */
 class MorpheNotificationListener : NotificationListenerService() {
+    companion object {
+        @Volatile private var active: MorpheNotificationListener? = null
+        fun updateEnabled(enabled: Boolean) {
+            active?.let { service ->
+                service.handler.post {
+                    if (enabled) service.beginObserving() else service.stopObserving()
+                }
+            }
+        }
+    }
+    private var observing = false
     private val handler = Handler(Looper.getMainLooper())
     private var sessionManager: MediaSessionManager? = null
     private var activeController: MediaController? = null
@@ -22,20 +33,25 @@ class MorpheNotificationListener : NotificationListenerService() {
     override fun onListenerConnected() {
         super.onListenerConnected()
         MirrorGateway.init(applicationContext)
-        if (!MirrorGateway.prefs.enabled) return
+        active = this
         sessionManager = getSystemService(MEDIA_SESSION_SERVICE) as MediaSessionManager
+        if (MirrorGateway.prefs.enabled) beginObserving()
+    }
+    private fun beginObserving() {
+        if (observing || !MirrorGateway.prefs.enabled) return
         runCatching {
             sessionManager?.addOnActiveSessionsChangedListener(
                 sessions, ComponentName(this, javaClass), handler)
+            observing = true
             refresh()
         }.onFailure { AppLog.add("MEDIA", "Unable to watch media sessions: ${it.javaClass.simpleName}") }
     }
 
     override fun onNotificationPosted(sbn: android.service.notification.StatusBarNotification?) {
-        if (sbn != null && EnginePolicy.isMorphe(sbn.packageName, MirrorGateway.prefs.morphePackage)) refresh()
+        if (observing && sbn != null && EnginePolicy.isMorphe(sbn.packageName, MirrorGateway.prefs.morphePackage)) refresh()
     }
     override fun onNotificationRemoved(sbn: android.service.notification.StatusBarNotification?) {
-        if (sbn != null && EnginePolicy.isMorphe(sbn.packageName, MirrorGateway.prefs.morphePackage)) refresh()
+        if (observing && sbn != null && EnginePolicy.isMorphe(sbn.packageName, MirrorGateway.prefs.morphePackage)) refresh()
     }
 
     private fun refresh(active: List<MediaController>? = null) {
@@ -55,19 +71,24 @@ class MorpheNotificationListener : NotificationListenerService() {
     private fun publish(playback: PlaybackState?) {
         MirrorGateway.playing(MirrorGateway.prefs.enabled && playback?.state == PlaybackState.STATE_PLAYING)
     }
+    private fun stopObserving() {
+        if (observing) sessionManager?.removeOnActiveSessionsChangedListener(sessions)
+        observing = false
+        unwatch()
+    }
     private fun unwatch() {
         activeController?.unregisterCallback(callbacks)
         activeController = null
         MirrorGateway.playing(false)
     }
     override fun onListenerDisconnected() {
-        sessionManager?.removeOnActiveSessionsChangedListener(sessions)
-        unwatch()
+        stopObserving()
+        if (active === this) active = null
         super.onListenerDisconnected()
     }
     override fun onDestroy() {
-        sessionManager?.removeOnActiveSessionsChangedListener(sessions)
-        unwatch()
+        stopObserving()
+        if (active === this) active = null
         super.onDestroy()
     }
 }

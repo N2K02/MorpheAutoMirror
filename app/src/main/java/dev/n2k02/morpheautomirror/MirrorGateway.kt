@@ -33,6 +33,7 @@ internal object MirrorGateway {
     }
 
     fun playing(value: Boolean) {
+        if (state.value.morphePlaying == value) return
         state.update { it.copy(morphePlaying = value) }
         AppLog.add("MEDIA", "Morphe playback=$value")
         sync()
@@ -62,6 +63,9 @@ internal object MirrorGateway {
     fun monitoring(value: Boolean) {
         prefs.enabled = value
         state.update { it.copy(monitoring = value) }
+        MorpheNotificationListener.updateEnabled(value)
+        val app = context as? MorpheApplication
+        if (value) app?.startConnectionMonitoring() else app?.stopConnectionMonitoring()
         if (!value) playing(false) else sync()
     }
     fun captureStarted() {
@@ -86,6 +90,8 @@ internal object MirrorGateway {
         prefs.enabled = false
         permissionNotificationShown = false
         stopCapture()
+        MorpheNotificationListener.updateEnabled(false)
+        (context as? MorpheApplication)?.stopConnectionMonitoring()
         context?.getSystemService(NotificationManager::class.java)?.cancel(PERMISSION_NOTIFICATION)
         AppLog.add("APP", "Quit requested; monitoring disabled")
     }

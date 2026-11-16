@@ -7,6 +7,22 @@ import androidx.lifecycle.Observer
 class MorpheApplication : Application() {
     private var connection: CarConnection? = null
     private var observer: Observer<Int>? = null
+    private var activeConnection = false
+    fun startConnectionMonitoring() {
+        if (activeConnection) return
+        val c = connection ?: return
+        val o = observer ?: return
+        c.type.observeForever(o)
+        activeConnection = true
+    }
+    fun stopConnectionMonitoring() {
+        if (!activeConnection) return
+        val c = connection ?: return
+        val o = observer ?: return
+        c.type.removeObserver(o)
+        activeConnection = false
+        MirrorGateway.carAvailable.value = false
+    }
     override fun onCreate() {
         super.onCreate()
         MirrorGateway.init(this)
@@ -17,12 +33,12 @@ class MorpheApplication : Application() {
                 mode == CarConnection.CONNECTION_TYPE_NATIVE
             AppLog.add("CAR", "Connection state changed: ${if (MirrorGateway.carAvailable.value) "connected" else "disconnected"}")
         }
-        car.type.observeForever(o)
         connection = car
         observer = o
+        if (MirrorGateway.prefs.enabled) startConnectionMonitoring()
     }
     override fun onTerminate() {
-        observer?.let { o -> connection?.type?.removeObserver(o) }
+        stopConnectionMonitoring()
         super.onTerminate()
     }
 }
