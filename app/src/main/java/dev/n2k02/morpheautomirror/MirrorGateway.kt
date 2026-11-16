@@ -148,7 +148,7 @@ internal object MirrorGateway {
         val pending = PendingIntent.getActivity(ctx, 12, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val n = NotificationCompat.Builder(ctx, "morphe_setup")
-            .setSmallIcon(R.drawable.ic_stat_app)
+            .setSmallIcon(R.drawable.ic_stat_morphe)
             .setContentTitle("Morphe video ready to mirror")
             .setContentText("Open on phone to grant screen capture (parked only)")
             .setContentIntent(pending)
