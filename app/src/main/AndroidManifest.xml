@@ -13,6 +13,7 @@
             <category android:name="android.intent.category.LAUNCHER"/>
         </intent>
         <package android:name="app.morphe.android.youtube"/>
+        <package android:name="dev.n2k02.localadb"/>
         <package android:name="com.google.android.youtube"/>
     </queries>
     <application android:name=".MorpheApplication" android:label="@string/app_name" android:icon="@mipmap/ic_launcher"
@@ -28,6 +29,12 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- Receives a Binder only from the local Shizuku server (UID 2000). -->
+        <provider android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="${applicationId}.shizuku"
+            android:enabled="true" android:exported="true"
+            android:multiprocess="false"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL"/>
         <service android:name=".MorpheNotificationListener"
             android:exported="true" android:label="@string/app_name"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
