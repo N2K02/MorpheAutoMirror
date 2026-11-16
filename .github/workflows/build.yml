@@ -98,32 +98,64 @@ jobs:
           else
             echo "SIGNING_READY=true" >> "$GITHUB_ENV"
           fi
-      - name: Resolve stable version and PR experimental suffix
+      - name: Resolve mRadio-compatible release version and notes
         if: env.SIGNING_READY == 'true'
         env:
           REQUESTED: ${{ github.event.inputs.version }}
         run: |
           set -euo pipefail
-          current=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1000 --json tagName -q '.[].tagName' | grep -E '^v[0-9]+\.[0-9]$' | sed 's/^v//' | sort -V | tail -1 || true)
-          if [[ -z "$current" ]]; then
-            next=1.0
-          else
-            n=$(( ${current%.*} * 10 + ${current#*.} + 1 ))
-            next="$((n/10)).$((n%10))"
-          fi
-          if [[ -n "$REQUESTED" && "$GITHUB_EVENT_NAME" != pull_request ]]; then
-            [[ "$REQUESTED" =~ ^[0-9]+\.[0-9]$ ]] || { echo "::error::Version must look like 1.0"; exit 1; }
-            if [[ "$REQUESTED" != "$next" ]]; then echo "::error::Expected next version $next"; exit 1; fi
-          fi
-          echo "VERSION=$next" >> "$GITHUB_ENV"
-          echo "VERSION_CODE=$((100000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+          python3 .github/scripts/version_code.py --self-test
+          git fetch --tags --force
+          local_last=$(git tag -l 'v[0-9]*' | sed -nE 's/^v([0-9]+[.][0-9])$/\\1/p' | sort -V | tail -1 || true)
+          release_last=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1000 --json tagName -q '.[].tagName' | sed -nE 's/^v([0-9]+[.][0-9])$/\\1/p' | sort -V | tail -1 || true)
+          last=$(printf '%s\\n%s\\n' "$local_last" "$release_last" | sed '/^$/d' | sort -V | tail -1 || true)
           if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
-            echo "VERSION_SUFFIX=-experimental.$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
-            echo "APK_NAME=MorpheAutoMirror-$next-experimental-PR${{ github.event.pull_request.number }}" >> "$GITHUB_ENV"
+            ver="${last:-1.0}"
+            if [[ -n "$last" ]]; then
+              n=$(( ${last%.*} * 10 + ${last#*.} + 1 ))
+              ver="$(( n / 10 )).$(( n % 10 ))"
+            fi
+          elif [[ -n "$REQUESTED" ]]; then
+            [[ "$REQUESTED" =~ ^[0-9]+\\.[0-9]$ ]] || { echo "::error::Version must be N.N"; exit 1; }
+            ver="$REQUESTED"
+          elif [[ -z "$last" ]]; then
+            ver=1.0
           else
-            echo "VERSION_SUFFIX=" >> "$GITHUB_ENV"
-            echo "APK_NAME=MorpheAutoMirror-$next" >> "$GITHUB_ENV"
+            n=$(( ${last%.*} * 10 + ${last#*.} + 1 ))
+            ver="$(( n / 10 )).$(( n % 10 ))"
           fi
+          if [[ "$GITHUB_EVENT_NAME" != pull_request && -n "$last" ]]; then
+            [[ "$(printf '%s\\n%s\\n' "$last" "$ver" | sort -V | tail -1)" == "$ver" && "$ver" != "$last" ]] || { echo "::error::Stable version must advance from $last"; exit 1; }
+          fi
+          echo "VERSION=$ver" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=$(python3 .github/scripts/version_code.py "$GITHUB_REPOSITORY" "$GITHUB_RUN_NUMBER")" >> "$GITHUB_ENV"
+          echo "VERSION_SUFFIX=" >> "$GITHUB_ENV"
+          echo "APK_NAME=MorpheAutoMirror-$ver" >> "$GITHUB_ENV"
+          prev=""
+          [[ -n "$last" ]] && git rev-parse -q --verify "refs/tags/v$last" >/dev/null && prev="v$last" || true
+          if [[ -n "$prev" ]]; then range="$prev..HEAD"; else range=HEAD; fi
+          changes=$(git log --no-merges --pretty='- %s' "$range" | head -40 || true)
+          {
+            echo "## MorpheAutoMirror $ver"
+            echo "Version code: $(python3 .github/scripts/version_code.py "$GITHUB_REPOSITORY" "$GITHUB_RUN_NUMBER")"
+            echo
+            echo "### What's new"
+            echo "${changes:-- Rebuild, no code changes}"
+            echo
+            echo "### Install"
+            echo "Download the signed APK from this release."
+          } > release-notes.md
+      - name: Use mRadio experimental release naming
+        if: github.event_name == 'pull_request' && env.SIGNING_READY == 'true'
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/experimental_naming.py --self-test
+          python3 .github/scripts/experimental_naming.py "$GITHUB_REPOSITORY" MorpheAutoMirror "$GITHUB_RUN_NUMBER" "${{ github.event.pull_request.number }}"
+      - name: Label experimental release notes
+        if: github.event_name == 'pull_request' && env.SIGNING_READY == 'true'
+        run: |
+          sed -i "1s|^## .*|## $EXPERIMENTAL_TITLE|" release-notes.md
+          printf '\\nExperimental sequence: %s\\n' "$EXPERIMENTAL_NUMBER" >> release-notes.md
       - name: Build signed release variant
         if: env.SIGNING_READY == 'true'
         run: |
@@ -158,5 +190,14 @@ jobs:
             TARGET="$GITHUB_SHA"
             EXTRA=(--latest)
           fi
-          gh release create "$TAG" "$APK_NAME.apk" --repo "$GITHUB_REPOSITORY" --target "$TARGET" --title "$TITLE" --notes "Android CI verified. Signed APK, versionCode $VERSION_CODE. Video is parked-only and experimental." "${EXTRA[@]}"
+          if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then TITLE="$EXPERIMENTAL_TITLE"; fi
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
+              gh release upload "$TAG" "$APK_NAME.apk" --repo "$GITHUB_REPOSITORY" --clobber
+            else
+              echo "::error::Stable release tag already exists: $TAG"; exit 1
+            fi
+          else
+            gh release create "$TAG" "$APK_NAME.apk" --repo "$GITHUB_REPOSITORY" --target "$TARGET" --title "$TITLE" --notes-file release-notes.md "${EXTRA[@]}"
+          fi
 
