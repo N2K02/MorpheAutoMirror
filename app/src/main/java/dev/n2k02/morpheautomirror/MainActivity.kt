@@ -3,6 +3,7 @@ package dev.n2k02.morpheautomirror
 import android.Manifest
 import android.content.ComponentName
 import android.content.Intent
+import android.net.Uri
 import android.content.pm.PackageManager
 import android.widget.ImageView
 import android.media.projection.MediaProjectionManager
@@ -501,6 +502,16 @@ class MainActivity : ComponentActivity() {
                                         enabled = !shizuku.deniedPermanently,
                                         modifier = Modifier.fillMaxWidth()
                                     ) { Text("Grant ADB access") }
+                                }
+                                if (!shizuku.permissionGranted) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            runCatching {
+                                                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/N2K02/LocalAdb/releases")))
+                                            }
+                                        },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) { Text("Get LocalADB · GitHub Releases") }
                                 }
                                 OutlinedButton(
                                     onClick = { ShizukuAccess.refresh() },
