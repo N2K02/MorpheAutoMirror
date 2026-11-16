@@ -105,6 +105,7 @@ class MainActivity : ComponentActivity() {
         val available by MirrorGateway.carAvailable.collectAsState()
         val error by MirrorGateway.lastError.collectAsState()
         val experimental by LiveUpdater.experimentalEnabled.collectAsState()
+        var page by rememberSaveable { mutableStateOf("Home") }
         val listenerStarted by MirrorGateway.listenerConnectedAt.collectAsState()
         val carStarted by MirrorGateway.carConnectedAt.collectAsState()
         val sessionFound by MirrorGateway.mediaSessionActive.collectAsState()
@@ -115,7 +116,6 @@ class MainActivity : ComponentActivity() {
                 delay(1000)
             }
         }
-        var page by rememberSaveable { mutableStateOf("Home") }
         BackHandler(enabled = page != "Home") { page = PageNavigation.parent(page) }
         var monitoring by remember { mutableStateOf(MirrorGateway.prefs.enabled) }
         var webView by remember { mutableStateOf(MirrorGateway.prefs.webViewMode) }
