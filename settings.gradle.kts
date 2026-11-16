@@ -4,6 +4,11 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // GeckoView stable artifacts are published by Mozilla, not Google Maven.
+        maven {
+            url = uri("https://maven.mozilla.org/maven2/")
+            content { includeGroup("org.mozilla.geckoview") }
+        }
         val token = providers.environmentVariable("N2K02_PACKAGES_TOKEN").orNull
         if (!token.isNullOrBlank()) {
             maven {
