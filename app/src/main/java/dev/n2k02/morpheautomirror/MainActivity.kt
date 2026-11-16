@@ -167,7 +167,7 @@ class MainActivity : ComponentActivity() {
         // Never start an Activity from a background notification listener.
         LaunchedEffect(next) {
             if (next != NextStep.ASK_PERMISSION) captureAttempted = false
-            if (next == NextStep.ASK_PERMISSION && !captureAttempted) {
+            if (next == NextStep.ASK_PERMISSION && !shizuku.readyForShell && !captureAttempted) {
                 captureAttempted = true
                 val m = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
                 launchCapture.launch(m.createScreenCaptureIntent())
@@ -274,7 +274,7 @@ class MainActivity : ComponentActivity() {
                                         modifier = Modifier.weight(1f).padding(start = 10.dp))
                                     HomeBadge(if (s.capturing) "ACTIVE" else "INACTIVE", s.capturing)
                                 }
-                                HomeStatusRow("Renderer", "Direct surface")
+                                HomeStatusRow("Renderer", if (shizuku.readyForShell) "scrcpy H.264 (experimental)" else "Direct surface")
                                 HomeStatusRow("Optional Shizuku", shizuku.label)
                                 HomeStatusRow("Capture", if (s.permissionGranted) "Granted" else "Not granted")
                                 Text("Capture permission is required per session. Audio stays in Morphe.",
@@ -436,7 +436,7 @@ class MainActivity : ComponentActivity() {
                                     modifier = Modifier.fillMaxWidth()) { Text("Recheck permission") }
                             }
                         }
-                        Text("Shizuku is not itself a video renderer. The current mirror uses MediaProjection; scrcpy needs a matching server and an H.264 decoder.",
+                        Text("When authorized, scrcpy captures through LocalAdb and an H.264 decoder renders to Android Auto. Without access, the existing MediaProjection path remains available.",
                             style = MaterialTheme.typography.bodySmall)
                     }
                     "Updates" -> {
