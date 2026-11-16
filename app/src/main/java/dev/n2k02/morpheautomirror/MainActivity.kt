@@ -126,7 +126,7 @@ class MainActivity : ComponentActivity() {
         }
         BackHandler(enabled = page != "Home") { page = PageNavigation.parent(page) }
         var monitoring by remember { mutableStateOf(MirrorGateway.prefs.enabled) }
-        var webView by remember { mutableStateOf(MirrorGateway.prefs.webViewMode) }
+        var geckoView by remember { mutableStateOf(MirrorGateway.prefs.geckoViewMode) }
         var installedMorphe by remember { mutableStateOf<String?>(null) }
         var listenerPermission by remember { mutableStateOf(false) }
         val refresh by uiRefresh.collectAsState()
@@ -276,7 +276,7 @@ class MainActivity : ComponentActivity() {
                                     HomeBadge(if (s.capturing) "ACTIVE" else "INACTIVE", s.capturing)
                                 }
                                 HomeStatusRow("Renderer",
-                                    if (webView) "WebView (experimental)" else "Direct surface")
+                                    if (geckoView) "GeckoView (experimental)" else "Direct surface")
                                 HomeStatusRow("Capture", if (s.permissionGranted) "Granted" else "Not granted")
                                 if (!s.parkedConfirmed) {
                                     Button(onClick = { MirrorGateway.parked(true) },
@@ -316,7 +316,7 @@ class MainActivity : ComponentActivity() {
                         HorizontalDivider()
                         ListItem(
                             headlineContent = { Text("Video rendering") },
-                            supportingContent = { Text("Direct surface or experimental WebView") },
+                            supportingContent = { Text("Direct surface or experimental GeckoView") },
                             leadingContent = { Icon(Icons.Rounded.Tune, null) },
                             trailingContent = { Icon(Icons.Rounded.ChevronRight, null) },
                             modifier = Modifier.fillMaxWidth().clickable { page = "Rendering" }
@@ -430,12 +430,12 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     "Rendering" -> {
-                        ListItem(headlineContent = { Text("Experimental WebView renderer") },
-                            supportingContent = { Text("MJPEG via local WebView, 640 × 360 at 5 fps. Direct surface is faster.") },
+                        ListItem(headlineContent = { Text("Experimental GeckoView renderer") },
+                            supportingContent = { Text("Local MJPEG in Firefox GeckoView, 640 × 360 at 5 fps. Direct surface is faster.") },
                             leadingContent = { Icon(Icons.Rounded.AutoAwesome, null) },
-                            trailingContent = { Switch(checked = webView, onCheckedChange = {
-                                webView = it
-                                MirrorGateway.prefs.webViewMode = it
+                            trailingContent = { Switch(checked = geckoView, onCheckedChange = {
+                                geckoView = it
+                                MirrorGateway.prefs.geckoViewMode = it
                                 MirrorGateway.parked(false)
                                 MirrorGateway.stopCapture()
                             }) })
