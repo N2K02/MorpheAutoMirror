@@ -12,10 +12,16 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          icon = Path('app/src/main/res/drawable/ic_stat_app.xml').read_text()
+          icon = Path('app/src/main/res/drawable/ic_stat_morphe.xml').read_text()
           manifest = Path('app/src/main/AndroidManifest.xml').read_text()
           assert 'fillColor="#FFFFFFFF"' in icon
           assert 'ic_launcher_foreground' not in icon
+          assert 'fillColor="#FF000000"' not in icon
+          assert 'viewportWidth="24"' in icon and 'viewportHeight="24"' in icon
+          for source in ['MirrorForegroundService.kt', 'MirrorGateway.kt']:
+              content = Path('app/src/main/java/dev/n2k02/morpheautomirror', source).read_text()
+              assert '.setSmallIcon(R.drawable.ic_stat_morphe)' in content
+              assert 'R.drawable.ic_stat_app' not in content
           assert 'android:icon="@mipmap/ic_launcher"' in manifest
           assert 'android:foregroundServiceType="mediaProjection"' in manifest
           print('Icon contract OK')
