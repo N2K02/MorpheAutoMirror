@@ -14,7 +14,7 @@ import java.security.SecureRandom
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Experimental local-only MJPEG transport for Android Auto WebView.
+ * Experimental local-only MJPEG transport for Android Auto GeckoView.
  * Bounded resolution/frame rate and one connection, no Internet listener.
  */
 internal class FrameCaptureServer : AutoCloseable {
@@ -78,7 +78,24 @@ internal class FrameCaptureServer : AutoCloseable {
                 if (line.isEmpty()) break
                 if (++headerCount > 40) return
             }
-            if (StreamAccess.authorized(request, accessToken)) {
+            if (StreamAccess.authorizedViewer(request, accessToken)) {
+                val body = StreamAccess.viewerHtml(accessToken).toByteArray(Charsets.UTF_8)
+                val headers = (
+                    "HTTP/1.1 200 OK\r\n" +
+                    "Content-Type: text/html; charset=utf-8\r\n" +
+                    "Content-Length: ${body.size}\r\n" +
+                    "Cache-Control: no-store\r\n" +
+                    "X-Content-Type-Options: nosniff\r\n" +
+                    "Referrer-Policy: no-referrer\r\n" +
+                    "Content-Security-Policy: default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'\r\n" +
+                    "Connection: close\r\n\r\n"
+                )
+                client.getOutputStream().apply {
+                    write(headers.toByteArray(Charsets.US_ASCII))
+                    write(body)
+                    flush()
+                }
+            } else if (StreamAccess.authorized(request, accessToken)) {
                 val output = client.getOutputStream()
                 output.write(("HTTP/1.1 200 OK\r\nContent-Type: multipart/x-mixed-replace; boundary=frame\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n").toByteArray())
                 while (running.get()) {
