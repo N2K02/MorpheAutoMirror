@@ -437,7 +437,7 @@ class MainActivity : ComponentActivity() {
                                         modifier = Modifier.size(32.dp),
                                         tint = MaterialTheme.colorScheme.primary)
                                     Column(Modifier.weight(1f)) {
-                                        Text("LocalADB Shizuku", style = MaterialTheme.typography.titleLarge)
+                                        Text("ADB connection", style = MaterialTheme.typography.titleLarge)
                                         Text("Privileged service connection",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -445,8 +445,8 @@ class MainActivity : ComponentActivity() {
                                 }
                                 HomeBadge(if (ready) "CONNECTED · SHELL READY" else "ACTION REQUIRED", ready)
                                 Text(
-                                    if (ready) "This app is authorized to use the running Shizuku server."
-                                    else "Connect to the Shizuku server managed by LocalADB. Access requires your approval.",
+                                    if (ready) "This app is authorized to use the running ADB service."
+                                    else "Connect to the ADB service managed by LocalADB. Access requires your approval.",
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                             }
@@ -500,7 +500,7 @@ class MainActivity : ComponentActivity() {
                                         onClick = { ShizukuAccess.request() },
                                         enabled = !shizuku.deniedPermanently,
                                         modifier = Modifier.fillMaxWidth()
-                                    ) { Text("Grant Shizuku access") }
+                                    ) { Text("Grant ADB access") }
                                 }
                                 OutlinedButton(
                                     onClick = { ShizukuAccess.refresh() },
@@ -514,7 +514,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         Text(
-                            "Shizuku access enables the experimental scrcpy capture path. Connection status does not confirm that Android Auto mirroring is active.",
+                            "ADB access enables the experimental scrcpy capture path. Connection status does not confirm that Android Auto mirroring is active.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
