@@ -6,13 +6,7 @@ val appVersion = (findProperty("appVersion") as String?) ?: "1.0"
 require(Regex("""\d+\.\d""").matches(appVersion))
 android {
     namespace = "dev.n2k02.morpheautomirror"
-    // GeckoView 160 requires Android API 37.2 metadata, not 37.0.
-    // This changes only compile-time APIs; targetSdk remains 36.
-    compileSdk {
-        version = release(37) {
-            minorApiLevel = 2
-        }
-    }
+    compileSdk = 37
     defaultConfig {
         applicationId = "dev.n2k02.morpheautomirror"
         minSdk = 26
@@ -52,8 +46,6 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.11.0")
     implementation("androidx.core:core-ktx:1.17.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.3")
-    // Firefox Gecko engine only for the optional parked-only MJPEG renderer.
-    implementation("org.mozilla.geckoview:geckoview:160.0.20261104181552")
     implementation("androidx.car.app:app:1.7.0")
     implementation("androidx.car.app:app-projected:1.7.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
