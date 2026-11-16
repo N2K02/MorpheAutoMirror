@@ -1,9 +1,12 @@
-# Signing secrets
+# Signing — shared mRadio identity
 
-Add GitHub Actions repository secrets SIGNING_KEYSTORE_BASE64 (single-line base64 JKS),
-SIGNING_STORE_PASSWORD, SIGNING_KEY_ALIAS, SIGNING_KEY_PASSWORD, and N2K02_PACKAGES_TOKEN.
+MorpheAutoMirror uses the same encrypted signing bundle and APK signature lineage as mRadio.
 
-The ephemeral runner writes signing/release.jks temporarily and removes it after APK signing.
-Never commit keystores or secret material. Use the **same certificate** for every experimental
-and stable build of MorpheAutoMirror. Stable GitHub Releases fail closed if signing is absent.
+- Encrypted bundle: `signing/keys.tar.enc` (identical Git blob to N2K02/MRadio).
+- Repository Actions secret: `SIGNING_PASSPHRASE` (same passphrase used for mRadio).
+- OpenSSL: AES-256-CBC, PBKDF2, 600000 iterations.
+- During CI, decrypt into a private runner temp directory, create the lineage from the old test key to the release key, sign using `apksigner`, then destroy temporary key files.
+- Experimental and stable builds share this signing identity, as explicitly requested. Preserve the key and passphrase for future updates.
+- Never commit decrypted keys, passphrase, or keystore passwords.
 
+The private signing secret still needs to be configured in this repository's GitHub Actions settings. Separate apps have distinct package IDs even when the signer is shared.
