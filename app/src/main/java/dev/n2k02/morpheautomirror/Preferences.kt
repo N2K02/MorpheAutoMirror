@@ -9,9 +9,5 @@ internal class Preferences(context: Context) {
     var morphePackage: String
         get() = p.getString("package", "app.morphe.android.youtube") ?: "app.morphe.android.youtube"
         set(v) { if (v.matches(Regex("[a-zA-Z_][a-zA-Z0-9_.]{2,150}"))) p.edit().putString("package", v).apply() }
-    var geckoViewMode: Boolean
-        // Keep existing opt-in when upgrading from the old WebView experiment.
-        get() = p.getBoolean("geckoview", p.getBoolean("webview", false))
-        set(v) { p.edit().putBoolean("geckoview", v).remove("webview").apply() }
 }
 
