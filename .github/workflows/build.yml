@@ -56,10 +56,7 @@ jobs:
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
     env:
       N2K02_PACKAGES_TOKEN: ${{ secrets.N2K02_PACKAGES_TOKEN }}
-      SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
-      SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
-      SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
-      SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+      SIGNING_PASSPHRASE: ${{ secrets.SIGNING_PASSPHRASE }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v7
@@ -87,12 +84,12 @@ jobs:
       - name: Validate signing availability
         run: |
           set -euo pipefail
-          if [[ -z "$SIGNING_KEYSTORE_BASE64" || -z "$SIGNING_STORE_PASSWORD" || -z "$SIGNING_KEY_ALIAS" || -z "$SIGNING_KEY_PASSWORD" ]]; then
+          if [[ -z "$SIGNING_PASSPHRASE" ]]; then
             if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
-              echo "::warning::Signing secrets missing; debug artifact only."
+              echo "::warning::SIGNING_PASSPHRASE missing; debug artifact only."
               echo "SIGNING_READY=false" >> "$GITHUB_ENV"
             else
-              echo "::error::Stable releases require signing secrets"
+              echo "::error::Stable releases require SIGNING_PASSPHRASE"
               exit 1
             fi
           else
@@ -156,18 +153,27 @@ jobs:
         run: |
           sed -i "1s|^## .*|## $EXPERIMENTAL_TITLE|" release-notes.md
           printf '\nExperimental sequence: %s\n' "$EXPERIMENTAL_NUMBER" >> release-notes.md
-      - name: Build signed release variant
+      - name: Build release and sign with mRadio lineage
         if: env.SIGNING_READY == 'true'
         run: |
           set -euo pipefail
-          mkdir -p signing
-          printf '%s' "$SIGNING_KEYSTORE_BASE64" | base64 -d > signing/release.jks
-          chmod 600 signing/release.jks
           gradle --no-daemon :app:testDebugUnitTest :app:assembleRelease -PappVersion="$VERSION" -PappVersionCode="$VERSION_CODE" -PappVersionSuffix="$VERSION_SUFFIX" -PuseSharedSources=true
-          cp app/build/outputs/apk/release/app-release.apk "$APK_NAME.apk"
-          TOOLS=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
-          "$TOOLS/apksigner" verify --print-certs "$APK_NAME.apk"
-          rm -f signing/release.jks
+          K="$RUNNER_TEMP/keys"
+          mkdir -p "$K"
+          chmod 700 "$K"
+          trap 'rm -rf "$K"' EXIT
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -in signing/keys.tar.enc -pass env:SIGNING_PASSPHRASE | tar -xf - -C "$K"
+          BT=$(ls -d "${ANDROID_HOME:-$ANDROID_SDK_ROOT}"/build-tools/* | sort -V | tail -1)
+          export RP=$(cat "$K/release.pass") OP=android
+          "$BT/apksigner" rotate --out "$K/lineage" \
+            --old-signer --ks "$K/old.keystore" --ks-pass env:OP --ks-key-alias androiddebugkey --key-pass env:OP \
+            --new-signer --ks "$K/release.p12" --ks-pass env:RP --ks-key-alias release --key-pass env:RP
+          "$BT/apksigner" sign \
+            --ks "$K/old.keystore" --ks-pass env:OP --ks-key-alias androiddebugkey --key-pass env:OP \
+            --next-signer --ks "$K/release.p12" --ks-pass env:RP --ks-key-alias release --key-pass env:RP \
+            --lineage "$K/lineage" --rotation-min-sdk-version 28 \
+            --out "$APK_NAME.apk" app/build/outputs/apk/release/app-release-unsigned.apk
+          "$BT/apksigner" verify --print-certs "$APK_NAME.apk"
       - name: Upload signed APK
         if: env.SIGNING_READY == 'true'
         uses: actions/upload-artifact@v7
