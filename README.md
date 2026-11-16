@@ -1,15 +1,16 @@
 # MorpheAutoMirror
 
-A standalone **parked-only experimental** Android Auto companion for Morphe-patched YouTube. A notification listener watches only the configured Morphe package, checks its media session and starts a MediaProjection session after a fresh user consent. An Android Auto Car App Library session supplies a surface for mirroring.
+A standalone **parked-only experimental** Android Auto companion for Morphe-patched YouTube. A notification listener watches only the automatically detected Morphe YouTube package, checks its media session and starts a MediaProjection session after a fresh user consent. An Android Auto Car App Library session supplies a surface for mirroring.
 
 ## Operation
 
-1. Install and open the application, grant Notification access, and turn on Automatic monitoring.
-2. Open Morphe YouTube (`app.morphe.android.youtube` by default). Play a video.
-3. Connect Android Auto and open **MorpheAutoMirror** in its launcher (the Android Auto host cannot be forced to switch apps).
-4. Confirm the vehicle is parked, then grant screen-capture permission on the phone for that session.
-5. Video is mirrored through a direct MediaProjection → car surface; choose WebView experiment for the slower local MJPEG path.
-6. Notification provides Stop mirroring. Pausing, stopping Morphe, disconnecting or Quit tears down capture.
+1. Install and open the application. Monitoring automatically looks for Morphe YouTube (including `app.morphe.android.youtube`) without a package-name field.
+2. Open Settings → Monitoring: verify the Morphe **Installed** badge and notification-listener **Granted** badge; use **Grant access** if needed. Enable Automatic Morphe listener.
+3. Open Morphe YouTube and play a video.
+4. Connect Android Auto and open **MorpheAutoMirror** in its launcher (the Android Auto host cannot be forced to switch apps).
+5. Confirm the vehicle is parked, then grant screen-capture permission on the phone for that session.
+6. Video is mirrored through a direct MediaProjection → car surface; choose WebView experiment for the slower local MJPEG path.
+7. Notification provides Stop mirroring. Pausing, stopping Morphe, disconnecting or Quit tears down capture.
 
 Video **never bypasses DRM**: secure/protected frames may be black. Never interact with video while driving. Android Auto does not provide a universal parked-state API; the required user confirmation is a safeguard, not vehicle-motion detection.
 
@@ -27,6 +28,8 @@ Video **never bypasses DRM**: secure/protected frames may be black. Never intera
 Tests run on every PR and main commit. The single reusable experimental PR uses mRadio's experimental naming, monotonic version codes, stable +0.1 version increments, changelog generation, and GitHub Releases.
 
 The signing configuration now matches **mRadio exactly**: the committed encrypted `signing/keys.tar.enc` uses `SIGNING_PASSPHRASE` in repository Actions secrets, decrypts only inside CI, and uses the same key rotation lineage to sign experimental and stable APKs. The encrypted bundle is intentionally identical to mRadio's, as requested. Add `SIGNING_PASSPHRASE` in this repository's Actions secrets; no per-app JKS secrets are required. Do not commit the passphrase or decrypted keys.
+
+Monitoring uses PackageManager discovery and actual notification-listener access checks; badges refresh on returning to the app. Ordinary YouTube is never treated as Morphe. Logs remain in Android Logcat for McpAdbAndroidLogger, not an in-app Logs page.
 
 The CI checks out the shared N2K02 theme/updater source and uses Gradle composite builds. Releases remain unverified until a green workflow and signed APK are available. Review the experimental PR before merging.
 
