@@ -35,8 +35,11 @@ import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.PowerSettingsNew
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.SettingsInputAntenna
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Update
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Surface
@@ -418,28 +421,103 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     "Shizuku" -> {
-                        Text("LocalAdb embedded Shizuku", style = MaterialTheme.typography.titleMedium)
-                        Text("Optional privileged access for scrcpy experiments. Installing LocalAdb does not automatically grant this app permission.",
-                            style = MaterialTheme.typography.bodyMedium)
-                        Card(Modifier.fillMaxWidth()) {
-                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                HomeStatusRow("Shizuku", shizuku.label)
-                                HomeBadge(if (shizuku.readyForShell) "SHELL AUTHORIZED" else "NOT AUTHORIZED", shizuku.readyForShell)
-                                if (!shizuku.binderAlive) {
-                                    Button(onClick = {
-                                        packageManager.getLaunchIntentForPackage("dev.n2k02.localadb")?.let(::startActivity)
-                                    }, modifier = Modifier.fillMaxWidth()) { Text("Open LocalAdb") }
-                                } else if (!shizuku.readyForShell) {
-                                    Button(onClick = { ShizukuAccess.request() },
-                                        enabled = !shizuku.deniedPermanently,
-                                        modifier = Modifier.fillMaxWidth()) { Text("Grant Shizuku permission") }
+                        val ready = shizuku.readyForShell
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(28.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (ready) MaterialTheme.colorScheme.primaryContainer
+                                else MaterialTheme.colorScheme.surfaceContainerHigh
+                            )
+                        ) {
+                            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Icon(Icons.Rounded.SettingsInputAntenna, null,
+                                        modifier = Modifier.size(32.dp),
+                                        tint = MaterialTheme.colorScheme.primary)
+                                    Column(Modifier.weight(1f)) {
+                                        Text("LocalADB Shizuku", style = MaterialTheme.typography.titleLarge)
+                                        Text("Privileged service connection",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
                                 }
-                                Button(onClick = { ShizukuAccess.refresh() },
-                                    modifier = Modifier.fillMaxWidth()) { Text("Recheck permission") }
+                                HomeBadge(if (ready) "CONNECTED · SHELL READY" else "ACTION REQUIRED", ready)
+                                Text(
+                                    if (ready) "This app is authorized to use the running Shizuku server."
+                                    else "Connect to the Shizuku server managed by LocalADB. Access requires your approval.",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
                             }
                         }
-                        Text("When authorized, scrcpy captures through LocalAdb and an H.264 decoder renders to Android Auto. Without access, the existing MediaProjection path remains available.",
-                            style = MaterialTheme.typography.bodySmall)
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                            )
+                        ) {
+                            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                                Text("Connection diagnostics", style = MaterialTheme.typography.titleMedium)
+                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                    Text("Server", modifier = Modifier.weight(1f))
+                                    HomeBadge(if (shizuku.binderAlive) "ONLINE" else "OFFLINE", shizuku.binderAlive)
+                                }
+                                HorizontalDivider()
+                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                    Text("App permission", modifier = Modifier.weight(1f))
+                                    HomeBadge(if (shizuku.permissionGranted) "GRANTED" else "REQUIRED",
+                                        shizuku.permissionGranted)
+                                }
+                                HorizontalDivider()
+                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                    Text("Shell identity", modifier = Modifier.weight(1f))
+                                    HomeBadge(if (ready) "UID ${shizuku.shellUid}" else "NOT VERIFIED", ready)
+                                }
+                            }
+                        }
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                            )
+                        ) {
+                            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Text("Manage access", style = MaterialTheme.typography.titleMedium)
+                                if (!shizuku.binderAlive) {
+                                    Button(
+                                        onClick = {
+                                            packageManager.getLaunchIntentForPackage("dev.n2k02.localadb")
+                                                ?.let(::startActivity)
+                                            ShizukuAccess.refresh()
+                                        },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) { Text("Connect via LocalADB") }
+                                } else if (!shizuku.permissionGranted) {
+                                    Button(
+                                        onClick = { ShizukuAccess.request() },
+                                        enabled = !shizuku.deniedPermanently,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) { Text("Grant Shizuku access") }
+                                }
+                                OutlinedButton(
+                                    onClick = { ShizukuAccess.refresh() },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) { Text("Refresh connection status") }
+                                Text(
+                                    "Authorization is per app. A running server does not automatically grant permission.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Text(
+                            "Shizuku access enables the experimental scrcpy capture path. Connection status does not confirm that Android Auto mirroring is active.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                     "Updates" -> {
                         N2K02UpdateScreen(
