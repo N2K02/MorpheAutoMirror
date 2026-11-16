@@ -28,9 +28,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.ChevronRight
-import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.DirectionsCar
 import androidx.compose.material.icons.rounded.Home
@@ -126,7 +124,6 @@ class MainActivity : ComponentActivity() {
         }
         BackHandler(enabled = page != "Home") { page = PageNavigation.parent(page) }
         var monitoring by remember { mutableStateOf(MirrorGateway.prefs.enabled) }
-        var geckoView by remember { mutableStateOf(MirrorGateway.prefs.geckoViewMode) }
         var installedMorphe by remember { mutableStateOf<String?>(null) }
         var listenerPermission by remember { mutableStateOf(false) }
         val refresh by uiRefresh.collectAsState()
@@ -187,7 +184,6 @@ class MainActivity : ComponentActivity() {
                         "Home" -> Icons.Rounded.Home
                         "Updates" -> Icons.Rounded.Update
                         "Monitoring" -> Icons.Rounded.NotificationsActive
-                        "Rendering" -> Icons.Rounded.Tune
                         else -> Icons.Rounded.Settings
                     }
                     Icon(icon, null)
@@ -275,8 +271,7 @@ class MainActivity : ComponentActivity() {
                                         modifier = Modifier.weight(1f).padding(start = 10.dp))
                                     HomeBadge(if (s.capturing) "ACTIVE" else "INACTIVE", s.capturing)
                                 }
-                                HomeStatusRow("Renderer",
-                                    if (geckoView) "GeckoView (experimental)" else "Direct surface")
+                                HomeStatusRow("Renderer", "Direct surface")
                                 HomeStatusRow("Capture", if (s.permissionGranted) "Granted" else "Not granted")
                                 } else {
                                     Button(onClick = {
@@ -306,14 +301,6 @@ class MainActivity : ComponentActivity() {
                             leadingContent = { Icon(Icons.Rounded.PlayCircle, null) },
                             trailingContent = { Icon(Icons.Rounded.ChevronRight, null) },
                             modifier = Modifier.fillMaxWidth().clickable { page = "Monitoring" }
-                        )
-                        HorizontalDivider()
-                        ListItem(
-                            headlineContent = { Text("Video rendering") },
-                            supportingContent = { Text("Direct surface or experimental GeckoView") },
-                            leadingContent = { Icon(Icons.Rounded.Tune, null) },
-                            trailingContent = { Icon(Icons.Rounded.ChevronRight, null) },
-                            modifier = Modifier.fillMaxWidth().clickable { page = "Rendering" }
                         )
                         HorizontalDivider()
                         Text("Updates", style = MaterialTheme.typography.titleMedium)
@@ -422,19 +409,6 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         }
-                    }
-                    "Rendering" -> {
-                        ListItem(headlineContent = { Text("Experimental GeckoView renderer") },
-                            supportingContent = { Text("Local MJPEG in Firefox GeckoView, 640 × 360 at 5 fps. Direct surface is faster.") },
-                            leadingContent = { Icon(Icons.Rounded.AutoAwesome, null) },
-                            trailingContent = { Switch(checked = geckoView, onCheckedChange = {
-                                geckoView = it
-                                MirrorGateway.prefs.geckoViewMode = it
-                                MirrorGateway.parked(false)
-                                MirrorGateway.stopCapture()
-                            }) })
-                        Text("Video capture requires permission for each session. Mirroring is parked-only.",
-                            style = MaterialTheme.typography.bodySmall)
                     }
                     "Updates" -> {
                         N2K02UpdateScreen(
