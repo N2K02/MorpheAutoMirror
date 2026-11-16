@@ -106,9 +106,9 @@ jobs:
           set -euo pipefail
           python3 .github/scripts/version_code.py --self-test
           git fetch --tags --force
-          local_last=$(git tag -l 'v[0-9]*' | sed -nE 's/^v([0-9]+[.][0-9])$/\\1/p' | sort -V | tail -1 || true)
-          release_last=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1000 --json tagName -q '.[].tagName' | sed -nE 's/^v([0-9]+[.][0-9])$/\\1/p' | sort -V | tail -1 || true)
-          last=$(printf '%s\\n%s\\n' "$local_last" "$release_last" | sed '/^$/d' | sort -V | tail -1 || true)
+          local_last=$(git tag -l 'v[0-9]*' | sed -nE 's/^v([0-9]+[.][0-9])$/\1/p' | sort -V | tail -1 || true)
+          release_last=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1000 --json tagName -q '.[].tagName' | sed -nE 's/^v([0-9]+[.][0-9])$/\1/p' | sort -V | tail -1 || true)
+          last=$(printf '%s\n%s\n' "$local_last" "$release_last" | sed '/^$/d' | sort -V | tail -1 || true)
           if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
             ver="${last:-1.0}"
             if [[ -n "$last" ]]; then
@@ -116,7 +116,7 @@ jobs:
               ver="$(( n / 10 )).$(( n % 10 ))"
             fi
           elif [[ -n "$REQUESTED" ]]; then
-            [[ "$REQUESTED" =~ ^[0-9]+\\.[0-9]$ ]] || { echo "::error::Version must be N.N"; exit 1; }
+            [[ "$REQUESTED" =~ ^[0-9]+\.[0-9]$ ]] || { echo "::error::Version must be N.N"; exit 1; }
             ver="$REQUESTED"
           elif [[ -z "$last" ]]; then
             ver=1.0
@@ -125,7 +125,7 @@ jobs:
             ver="$(( n / 10 )).$(( n % 10 ))"
           fi
           if [[ "$GITHUB_EVENT_NAME" != pull_request && -n "$last" ]]; then
-            [[ "$(printf '%s\\n%s\\n' "$last" "$ver" | sort -V | tail -1)" == "$ver" && "$ver" != "$last" ]] || { echo "::error::Stable version must advance from $last"; exit 1; }
+            [[ "$(printf '%s\n%s\n' "$last" "$ver" | sort -V | tail -1)" == "$ver" && "$ver" != "$last" ]] || { echo "::error::Stable version must advance from $last"; exit 1; }
           fi
           echo "VERSION=$ver" >> "$GITHUB_ENV"
           echo "VERSION_CODE=$(python3 .github/scripts/version_code.py "$GITHUB_REPOSITORY" "$GITHUB_RUN_NUMBER")" >> "$GITHUB_ENV"
@@ -155,7 +155,7 @@ jobs:
         if: github.event_name == 'pull_request' && env.SIGNING_READY == 'true'
         run: |
           sed -i "1s|^## .*|## $EXPERIMENTAL_TITLE|" release-notes.md
-          printf '\\nExperimental sequence: %s\\n' "$EXPERIMENTAL_NUMBER" >> release-notes.md
+          printf '\nExperimental sequence: %s\n' "$EXPERIMENTAL_NUMBER" >> release-notes.md
       - name: Build signed release variant
         if: env.SIGNING_READY == 'true'
         run: |
