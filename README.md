@@ -41,7 +41,6 @@ User consent -> MediaProjection -> one VirtualDisplay -> Android Auto Surface
 
 The application does **not** use the scrcpy program, ADB-shell server, socket protocol, video encoder or FFmpeg decoder. scrcpy is only a conceptual reference for low-latency capture; adding its encoded stream and decoder to the same Android device would add complexity and could increase latency. Native Android MediaProjection already supports routing pixels directly to a Surface without that extra encode/decode path. A new capture session still requires user authorization; MediaProjection may show protected video as black.
 
-```
 The CI checks out the shared N2K02 theme/updater source and uses Gradle composite builds. Releases remain unverified until a green workflow and signed APK are available. Review the experimental PR before merging.
 
 ## Local build
