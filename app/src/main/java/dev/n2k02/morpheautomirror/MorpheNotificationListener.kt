@@ -34,6 +34,7 @@ class MorpheNotificationListener : NotificationListenerService() {
         super.onListenerConnected()
         MirrorGateway.init(applicationContext)
         active = this
+        MirrorGateway.listenerConnection(true)
         sessionManager = getSystemService(MEDIA_SESSION_SERVICE) as MediaSessionManager
         if (MirrorGateway.prefs.enabled) beginObserving()
     }
@@ -66,6 +67,7 @@ class MorpheNotificationListener : NotificationListenerService() {
             activeController = chosen
             chosen?.registerCallback(callbacks, handler)
         }
+        MirrorGateway.mediaSessionActive.value = chosen != null
         publish(chosen?.playbackState)
     }
     private fun publish(playback: PlaybackState?) {
@@ -79,11 +81,15 @@ class MorpheNotificationListener : NotificationListenerService() {
     private fun unwatch() {
         activeController?.unregisterCallback(callbacks)
         activeController = null
+        MirrorGateway.mediaSessionActive.value = false
         MirrorGateway.playing(false)
     }
     override fun onListenerDisconnected() {
         stopObserving()
-        if (active === this) active = null
+        if (active === this) {
+            active = null
+            MirrorGateway.listenerConnection(false)
+        }
         super.onListenerDisconnected()
     }
     override fun onDestroy() {
