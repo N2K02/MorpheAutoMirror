@@ -43,6 +43,22 @@ jobs:
           repository: N2K02/n2k02updater
           path: shared/n2k02updater
           persist-credentials: false
+      - name: Assert single direct-surface renderer
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          source = Path("app/src/main/java/dev/n2k02/morpheautomirror/MirrorForegroundService.kt").read_text()
+          activity = Path("app/src/main/java/dev/n2k02/morpheautomirror/MainActivity.kt").read_text()
+          gradle = Path("app/build.gradle.kts").read_text()
+          settings = Path("settings.gradle.kts").read_text()
+          assert '"morphe-direct"' in source and 'display.setSurface(target.surface)' in source
+          assert 'GeckoView' not in source and 'FrameCaptureServer' not in source
+          assert 'GeckoView' not in activity and 'Rendering" ->' not in activity
+          assert 'geckoview' not in gradle.lower() and 'maven.mozilla.org' not in settings
+          for name in ['GeckoViewMirror.kt','FrameCaptureServer.kt','StreamAccess.kt']:
+              assert not Path("app/src/main/java/dev/n2k02/morpheautomirror", name).exists()
+          print("Direct Surface contract OK")
+          PY
       - name: Kotlin unit tests, Android lint and debug build
         run: gradle --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug -PuseSharedSources=true
       - uses: actions/upload-artifact@v7
