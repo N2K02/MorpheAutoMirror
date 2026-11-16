@@ -6,6 +6,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.SystemClock
 import android.view.Surface
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,6 +19,18 @@ internal object MirrorGateway {
     val state = MutableStateFlow(MirrorState())
     val surface = MutableStateFlow<CarTarget?>(null)
     val carAvailable = MutableStateFlow(false)
+    val listenerConnectedAt = MutableStateFlow<Long?>(null)
+    val carConnectedAt = MutableStateFlow<Long?>(null)
+    val mediaSessionActive = MutableStateFlow(false)
+    fun listenerConnection(connected: Boolean) {
+        listenerConnectedAt.value = if (connected) listenerConnectedAt.value ?: SystemClock.elapsedRealtime() else null
+        if (!connected) mediaSessionActive.value = false
+        AppLog.add("MEDIA", "Notification listener connected=$connected")
+    }
+    fun carConnection(connected: Boolean) {
+        carAvailable.value = connected
+        carConnectedAt.value = if (connected) carConnectedAt.value ?: SystemClock.elapsedRealtime() else null
+    }
     val lastError = MutableStateFlow("")
     lateinit var prefs: Preferences
         private set
@@ -92,6 +105,9 @@ internal object MirrorGateway {
     }
     fun quit() {
         state.value = MirrorState(monitoring = false)
+        listenerConnectedAt.value = null
+        carConnectedAt.value = null
+        mediaSessionActive.value = false
         surface.value = null
         prefs.enabled = false
         permissionNotificationShown = false
