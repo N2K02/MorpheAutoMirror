@@ -6,7 +6,13 @@ val appVersion = (findProperty("appVersion") as String?) ?: "1.0"
 require(Regex("""\d+\.\d""").matches(appVersion))
 android {
     namespace = "dev.n2k02.morpheautomirror"
-    compileSdk = 37
+    // GeckoView 160 requires Android API 37.2 metadata, not 37.0.
+    // This changes only compile-time APIs; targetSdk remains 36.
+    compileSdk {
+        version = release(37) {
+            minorApiLevel = 2
+        }
+    }
     defaultConfig {
         applicationId = "dev.n2k02.morpheautomirror"
         minSdk = 26
