@@ -57,7 +57,11 @@ internal object ShizukuAccess {
         val denied = if (granted) false else runCatching {
             Shizuku.shouldShowRequestPermissionRationale()
         }.getOrDefault(false)
-        status.value = ShizukuStatus(true, granted, uid, denied)
+        val next = ShizukuStatus(true, granted, uid, denied)
+        if (status.value != next) {
+            status.value = next
+            MirrorGateway.sync()
+        }
         AppLog.add("SHIZUKU", "Manager ready=$binder, granted=$granted, shellUid=${uid ?: "unknown"}")
     }
 
