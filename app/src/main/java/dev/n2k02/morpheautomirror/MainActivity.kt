@@ -191,7 +191,7 @@ class MainActivity : ComponentActivity() {
                         "Home" -> Icons.Rounded.Home
                         "Updates" -> Icons.Rounded.Update
                         "Monitoring" -> Icons.Rounded.NotificationsActive
-                        "Shizuku" -> Icons.Rounded.Tune
+                        "ADB" -> Icons.Rounded.Tune
                         else -> Icons.Rounded.Settings
                     }
                     Icon(icon, null)
@@ -306,11 +306,11 @@ class MainActivity : ComponentActivity() {
                             modifier = Modifier.fillMaxWidth().clickable { page = "Monitoring" }
                         )
                         ListItem(
-                            headlineContent = { Text("Shizuku access") },
+                            headlineContent = { Text("ADB") },
                             supportingContent = { Text("LocalAdb shell permission status for scrcpy experiments") },
                             leadingContent = { Icon(Icons.Rounded.Tune, null) },
                             trailingContent = { Icon(Icons.Rounded.ChevronRight, null) },
-                            modifier = Modifier.fillMaxWidth().clickable { page = "Shizuku" }
+                            modifier = Modifier.fillMaxWidth().clickable { page = "ADB" }
                         )
                         HorizontalDivider()
                         Text("Updates", style = MaterialTheme.typography.titleMedium)
@@ -420,7 +420,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
-                    "Shizuku" -> {
+                    "ADB" -> {
                         val ready = shizuku.readyForShell
                         Card(
                             modifier = Modifier.fillMaxWidth(),
