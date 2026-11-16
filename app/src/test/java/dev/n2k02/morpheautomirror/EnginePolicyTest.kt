@@ -34,5 +34,17 @@ class EnginePolicyTest {
     @Test fun quitStopsCapture() = assertEquals(NextStep.STOP,
         EnginePolicy.plan(MirrorState(monitoring = false, morphePlaying = true, capturing = true,
             carSession = true)))
+    @Test fun missingSurfaceStopsExistingCapture() = assertEquals(NextStep.STOP,
+        EnginePolicy.plan(MirrorState(morphePlaying = true, carSession = true,
+            parkedConfirmed = true, surfaceReady = false, permissionGranted = true,
+            capturing = true)))
+    @Test fun noConsentRequestedAfterParkedApprovalRevoked() = assertEquals(NextStep.WAIT_FOR_PARKED,
+        EnginePolicy.plan(MirrorState(morphePlaying = true, carSession = true,
+            parkedConfirmed = false, surfaceReady = true)))
+    @Test fun noConsentRequestedWhenCarAppIsNotRunning() = assertEquals(NextStep.WAIT_FOR_CAR,
+        EnginePolicy.plan(MirrorState(morphePlaying = true, carSession = false,
+            parkedConfirmed = false, surfaceReady = false)))
+    @Test fun noMonitoringNeverStartsCapture() = assertEquals(NextStep.IDLE,
+        EnginePolicy.plan(MirrorState(monitoring = false, morphePlaying = true,
+            carSession = true, parkedConfirmed = true, surfaceReady = true)))
 }
-
