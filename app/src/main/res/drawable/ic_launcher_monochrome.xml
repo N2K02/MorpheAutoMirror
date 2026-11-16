@@ -2,11 +2,13 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <!-- Single-color alpha shape for themed launcher icons. -->
+    <!-- Centered 79% symbol to fit Android adaptive-icon masks. -->
+    <group android:pivotX="54" android:pivotY="54" android:scaleX="0.79" android:scaleY="0.79">
     <path android:fillColor="#FFFFFFFF"
         android:pathData="M22,77 L22,33 Q22,26 28,26 L33,26 Q36,26 38,30 L55,52 L46,66 L37,54 L37,77 Q37,82 32,82 L27,82 Q22,82 22,77 Z"/>
     <path android:fillColor="#FFFFFFFF"
         android:pathData="M86,77 L86,33 Q86,26 80,26 L75,26 Q72,26 70,30 L53,52 L62,66 L71,54 L71,77 Q71,82 76,82 L81,82 Q86,82 86,77 Z"/>
     <path android:fillColor="#FFFFFFFF"
         android:pathData="M47,42 Q47,39 50,40 L66,51 Q68,52 66,54 L50,66 Q47,68 47,64 Z"/>
+    </group>
 </vector>
