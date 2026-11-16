@@ -55,3 +55,14 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
 }
 
+val stageScrcpyServer = tasks.register<Exec>("stageScrcpyServer") {
+    group = "build setup"
+    description = "Fetch the hash-verified upstream scrcpy server for privileged mirroring"
+    workingDir = rootProject.projectDir
+    commandLine("bash", "scripts/fetch-scrcpy-server.sh")
+    outputs.file(layout.projectDirectory.file("src/main/assets/scrcpy-server-v3.3.4"))
+}
+tasks.matching { it.name == "preBuild" }.configureEach {
+    dependsOn(stageScrcpyServer)
+}
+
