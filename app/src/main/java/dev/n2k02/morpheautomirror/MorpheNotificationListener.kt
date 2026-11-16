@@ -97,7 +97,10 @@ class MorpheNotificationListener : NotificationListenerService() {
     }
     override fun onDestroy() {
         stopObserving()
-        if (active === this) active = null
+        if (active === this) {
+            active = null
+            MirrorGateway.listenerConnection(false)
+        }
         super.onDestroy()
     }
 }
