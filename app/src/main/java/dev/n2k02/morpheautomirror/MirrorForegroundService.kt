@@ -142,7 +142,7 @@ class MirrorForegroundService : Service() {
                         DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
                         r.inputSurface, null, mainHandler)
                 }
-                if (web == null) web = WebViewMirror(this, reader!!.port)
+                if (web == null) web = WebViewMirror(this, reader!!.port, reader!!.accessToken)
                 web?.attach(target)
             } else {
                 val display = virtualDisplay
