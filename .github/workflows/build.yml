@@ -1,0 +1,144 @@
+name: Android verification and signed releases
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Optional next stable version, e.g. 1.2'
+        required: false
+        default: ''
+permissions:
+  contents: write
+concurrency:
+  group: morphe-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    env:
+      N2K02_PACKAGES_TOKEN: ${{ secrets.N2K02_PACKAGES_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '9.9.0'
+      - name: Check private package credentials
+        run: |
+          if [ -z "$N2K02_PACKAGES_TOKEN" ]; then
+            echo "::error::Add N2K02_PACKAGES_TOKEN to Actions secrets"
+            exit 1
+          fi
+      - name: Kotlin unit tests, Android lint and debug build
+        run: gradle --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+      - uses: actions/upload-artifact@v7
+        with:
+          name: MorpheAutoMirror-debug-${{ github.run_number }}
+          path: app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
+  release:
+    needs: verify
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    env:
+      N2K02_PACKAGES_TOKEN: ${{ secrets.N2K02_PACKAGES_TOKEN }}
+      SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+      SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+      SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+      SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '9.9.0'
+      - name: Validate signing availability
+        run: |
+          set -euo pipefail
+          if [[ -z "$SIGNING_KEYSTORE_BASE64" || -z "$SIGNING_STORE_PASSWORD" || -z "$SIGNING_KEY_ALIAS" || -z "$SIGNING_KEY_PASSWORD" ]]; then
+            if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
+              echo "::warning::Signing secrets missing; debug artifact only."
+              echo "SIGNING_READY=false" >> "$GITHUB_ENV"
+            else
+              echo "::error::Stable releases require signing secrets"
+              exit 1
+            fi
+          else
+            echo "SIGNING_READY=true" >> "$GITHUB_ENV"
+          fi
+      - name: Resolve stable version and PR experimental suffix
+        if: env.SIGNING_READY == 'true'
+        env:
+          REQUESTED: ${{ github.event.inputs.version }}
+        run: |
+          set -euo pipefail
+          current=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1000 --json tagName -q '.[].tagName' | grep -E '^v[0-9]+\.[0-9]$' | sed 's/^v//' | sort -V | tail -1 || true)
+          if [[ -z "$current" ]]; then
+            next=1.0
+          else
+            n=$(( ${current%.*} * 10 + ${current#*.} + 1 ))
+            next="$((n/10)).$((n%10))"
+          fi
+          if [[ -n "$REQUESTED" && "$GITHUB_EVENT_NAME" != pull_request ]]; then
+            [[ "$REQUESTED" =~ ^[0-9]+\.[0-9]$ ]] || { echo "::error::Version must look like 1.0"; exit 1; }
+            if [[ "$REQUESTED" != "$next" ]]; then echo "::error::Expected next version $next"; exit 1; fi
+          fi
+          echo "VERSION=$next" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=$((100000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+          if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
+            echo "VERSION_SUFFIX=-experimental.$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
+            echo "APK_NAME=MorpheAutoMirror-$next-experimental-PR${{ github.event.pull_request.number }}" >> "$GITHUB_ENV"
+          else
+            echo "VERSION_SUFFIX=" >> "$GITHUB_ENV"
+            echo "APK_NAME=MorpheAutoMirror-$next" >> "$GITHUB_ENV"
+          fi
+      - name: Build signed release variant
+        if: env.SIGNING_READY == 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p signing
+          printf '%s' "$SIGNING_KEYSTORE_BASE64" | base64 -d > signing/release.jks
+          chmod 600 signing/release.jks
+          gradle --no-daemon :app:testDebugUnitTest :app:assembleRelease -PappVersion="$VERSION" -PappVersionCode="$VERSION_CODE" -PappVersionSuffix="$VERSION_SUFFIX"
+          cp app/build/outputs/apk/release/app-release.apk "$APK_NAME.apk"
+          TOOLS=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$TOOLS/apksigner" verify --print-certs "$APK_NAME.apk"
+          rm -f signing/release.jks
+      - name: Upload signed APK
+        if: env.SIGNING_READY == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ env.APK_NAME }}
+          path: ${{ env.APK_NAME }}.apk
+          retention-days: 30
+      - name: Publish experimental prerelease or stable release
+        if: env.SIGNING_READY == 'true'
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
+            TAG="experimental-pr-${{ github.event.pull_request.number }}-run-$GITHUB_RUN_NUMBER"
+            TITLE="MorpheAutoMirror $VERSION experimental PR #${{ github.event.pull_request.number }}"
+            TARGET="${{ github.event.pull_request.head.sha }}"
+            EXTRA=(--prerelease --latest=false)
+          else
+            TAG="v$VERSION"
+            TITLE="MorpheAutoMirror $VERSION"
+            TARGET="$GITHUB_SHA"
+            EXTRA=(--latest)
+          fi
+          gh release create "$TAG" "$APK_NAME.apk" --repo "$GITHUB_REPOSITORY" --target "$TARGET" --title "$TITLE" --notes "Android CI verified. Signed APK, versionCode $VERSION_CODE. Video is parked-only and experimental." "${EXTRA[@]}"
+

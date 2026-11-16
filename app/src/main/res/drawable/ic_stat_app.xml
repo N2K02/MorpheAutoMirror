@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Proper monochrome alpha-only status bar mask (never use adaptive launcher icon). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+<path android:fillColor="#FFFFFFFF" android:pathData="M2,4h20v14H2z M4,6v10h16V6z M9,8l6,3 -6,3z M8,21h8v-2H8z"/>
+</vector>
