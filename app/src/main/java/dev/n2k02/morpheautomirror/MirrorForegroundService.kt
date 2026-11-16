@@ -34,7 +34,7 @@ class MirrorForegroundService : Service() {
     private val mainHandler = Handler(Looper.getMainLooper())
     private var projection: MediaProjection? = null
     private var virtualDisplay: VirtualDisplay? = null
-    private var web: WebViewMirror? = null
+    private var gecko: GeckoViewMirror? = null
     private var reader: FrameCaptureServer? = null
     private var currentTarget: CarTarget? = null
     private var targetJob: Job? = null
@@ -125,7 +125,7 @@ class MirrorForegroundService : Service() {
         projection = p
         MirrorGateway.captureStarted()
         MirrorGateway.surface.value?.let { attach(it) }
-        AppLog.add("CAPTURE", "Projection acquired; mode=${if (MirrorGateway.prefs.webViewMode) "WebView" else "direct"}")
+        AppLog.add("CAPTURE", "Projection acquired; mode=${if (MirrorGateway.prefs.geckoViewMode) "GeckoView" else "direct"}")
     }
 
     private fun attach(target: CarTarget) {
@@ -133,17 +133,17 @@ class MirrorForegroundService : Service() {
         currentTarget = target
         val p = projection ?: return
         try {
-            if (MirrorGateway.prefs.webViewMode) {
+            if (MirrorGateway.prefs.geckoViewMode) {
                 if (reader == null) {
                     val r = FrameCaptureServer()
                     reader = r
-                    virtualDisplay = p.createVirtualDisplay("morphe-web-frames",
+                    virtualDisplay = p.createVirtualDisplay("morphe-gecko-frames",
                         r.width, r.height, r.dpi,
                         DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
                         r.inputSurface, null, mainHandler)
                 }
-                if (web == null) web = WebViewMirror(this, reader!!.port, reader!!.accessToken)
-                web?.attach(target)
+                if (gecko == null) gecko = GeckoViewMirror(this, reader!!.port, reader!!.accessToken)
+                gecko?.attach(target)
             } else {
                 val display = virtualDisplay
                 if (display == null) {
@@ -166,7 +166,7 @@ class MirrorForegroundService : Service() {
 
     private fun detach() {
         currentTarget = null
-        if (MirrorGateway.prefs.webViewMode) web?.detach()
+        if (MirrorGateway.prefs.geckoViewMode) gecko?.detach()
         else virtualDisplay?.setSurface(null)
     }
 
@@ -174,8 +174,8 @@ class MirrorForegroundService : Service() {
         shuttingDown = true
         targetJob?.cancel()
         scope.cancel()
-        web?.close()
-        web = null
+        gecko?.close()
+        gecko = null
         virtualDisplay?.setSurface(null)
         virtualDisplay?.release()
         virtualDisplay = null
