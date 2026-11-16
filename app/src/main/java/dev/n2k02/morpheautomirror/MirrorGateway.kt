@@ -45,10 +45,14 @@ internal object MirrorGateway {
         }
     }
 
-    fun playing(value: Boolean) {
-        if (state.value.morphePlaying == value) return
-        state.update { it.copy(morphePlaying = value) }
-        AppLog.add("MEDIA", "Morphe playback=$value")
+    fun playing(value: Boolean, paused: Boolean = false) {
+        if (state.value.morphePlaying == value && state.value.morphePaused == paused) return
+        state.update { it.copy(morphePlaying = value, morphePaused = paused) }
+        AppLog.add("MEDIA", "Morphe state=" + when {
+            value -> "playing"
+            paused -> "paused"
+            else -> "stopped"
+        })
         sync()
     }
     fun carSession(value: Boolean) {
