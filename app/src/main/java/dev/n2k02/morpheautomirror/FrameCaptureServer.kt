@@ -10,6 +10,7 @@ import java.io.ByteArrayOutputStream
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
+import java.security.SecureRandom
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -26,12 +27,16 @@ internal class FrameCaptureServer : AutoCloseable {
     val inputSurface: Surface get() = imageReader.surface
     private val socket = ServerSocket(0, 1, InetAddress.getByName("127.0.0.1"))
     val port: Int = socket.localPort
+    val accessToken: String = ByteArray(24).also { SecureRandom().nextBytes(it) }
+        .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+    @Volatile private var activeClient: Socket? = null
     @Volatile private var latestFrame: ByteArray? = null
     private var lastFrameAt = 0L
     private val acceptThread = Thread({
         while (running.get()) {
             val client = try { socket.accept() } catch (_: Exception) { break }
-            client.use { deliver(it) }
+            activeClient = client
+            try { client.use { deliver(it) } } finally { activeClient = null }
         }
     }, "morphe-loopback").apply { isDaemon = true; start() }
 
@@ -66,9 +71,14 @@ internal class FrameCaptureServer : AutoCloseable {
         try {
             client.soTimeout = 5000
             val reader = client.getInputStream().bufferedReader()
-            val request = reader.readLine() ?: return
-            while (true) { val line = reader.readLine() ?: return; if (line.isEmpty()) break }
-            if (request.startsWith("GET /stream ")) {
+            val request = reader.readLine()?.takeIf { it.length <= 4096 } ?: return
+            var headerCount = 0
+            while (true) {
+                val line = reader.readLine()?.takeIf { it.length <= 4096 } ?: return
+                if (line.isEmpty()) break
+                if (++headerCount > 40) return
+            }
+            if (StreamAccess.authorized(request, accessToken)) {
                 val output = client.getOutputStream()
                 output.write(("HTTP/1.1 200 OK\r\nContent-Type: multipart/x-mixed-replace; boundary=frame\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n").toByteArray())
                 while (running.get()) {
@@ -82,13 +92,14 @@ internal class FrameCaptureServer : AutoCloseable {
                     Thread.sleep(200)
                 }
             } else {
-                client.getOutputStream().write("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n".toByteArray())
+                client.getOutputStream().write("HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".toByteArray())
             }
         } catch (_: Exception) { /* client disconnected */ }
     }
     override fun close() {
         running.set(false)
         runCatching { socket.close() }
+        runCatching { activeClient?.close() }
         imageReader.setOnImageAvailableListener(null, null)
         imageReader.close()
         frameThread.quitSafely()
