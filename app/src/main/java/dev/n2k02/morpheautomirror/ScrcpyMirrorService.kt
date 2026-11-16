@@ -6,6 +6,8 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.ComponentName
+import android.content.ServiceConnection
 import android.content.pm.ServiceInfo
 import android.media.MediaCodec
 import android.media.MediaFormat
@@ -24,23 +26,28 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import rikka.shizuku.Shizuku
-import rikka.shizuku.ShizukuRemoteProcess
 import java.io.BufferedInputStream
 import java.io.DataInputStream
 import java.io.IOException
 import java.security.SecureRandom
 import java.util.Locale
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /**
  * Experimental same-device scrcpy client: shell-owned capture, Android MediaCodec decode
  * straight onto the Android Auto Surface. No browser, audio duplication or remote network.
  * A live, explicitly granted LocalAdb/Shizuku Binder is required.
  */
-@Suppress("DEPRECATION")
 class ScrcpyMirrorService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     @Volatile private var socket: LocalSocket? = null
-    @Volatile private var remote: ShizukuRemoteProcess? = null
+    @Volatile private var shell: IScrcpyShellService? = null
+    private var shellConnection: ServiceConnection? = null
+    private val shellArgs by lazy {
+        Shizuku.UserServiceArgs(ComponentName(this, ScrcpyShellUserService::class.java))
+            .daemon(false).tag("morphe-scrcpy").version(1).processNameSuffix("scrcpy")
+    }
     @Volatile private var decoder: MediaCodec? = null
     private var job: Job? = null
 
@@ -99,23 +106,15 @@ class ScrcpyMirrorService : Service() {
         check(MirrorGateway.state.value.carSession && MirrorGateway.state.value.surfaceReady) {
             "Android Auto car session unavailable"
         }
-        val shellJar = "/data/local/tmp/morphe-scrcpy-${android.os.Process.myUid()}.jar"
-        stageServer(shellJar)
+        // Shizuku 13.1.5 makes newProcess private; use the supported UserService
+        // process (which runs as UID 2000) instead of invoking private APIs.
+        val privileged = bindShell()
+        assets.open("scrcpy-server-v3.3.4").use { source ->
+            privileged.stageServer(source.readBytes())
+        }
         val id = SecureRandom().nextInt(Int.MAX_VALUE)
         val scid = String.format(Locale.ROOT, "%08x", id)
-        val command = "CLASSPATH=$shellJar /system/bin/app_process / com.genymobile.scrcpy.Server 3.3.4 " +
-            "scid=$scid tunnel_forward=true audio=false control=false " +
-            "send_dummy_byte=false send_device_meta=false video_codec=h264 " +
-            "max_size=1280 max_fps=30 video_bit_rate=2500000"
-        remote = Shizuku.newProcess(arrayOf("/system/bin/sh", "-c", command), null, null)
-        val process = remote ?: error("scrcpy shell launch failed")
-        Thread {
-            runCatching {
-                process.errorStream.bufferedReader().useLines { lines ->
-                    lines.take(30).forEach { AppLog.add("SCRCPY", it.take(180)) }
-                }
-            }
-        }.apply { name = "morphe-scrcpy-stderr"; isDaemon = true; start() }
+        privileged.startServer(scid)
 
         val client = LocalSocket()
         var connected = false
@@ -129,7 +128,9 @@ class ScrcpyMirrorService : Service() {
                 Thread.sleep(100)
             }
         }
-        check(connected) { "Could not connect to local scrcpy socket" }
+        check(connected) {
+            "Could not connect to local scrcpy socket: ${runCatching { privileged.lastError }.getOrDefault("").take(100)}"
+        }
         socket = client
         client.soTimeout = 5000
         val input = DataInputStream(BufferedInputStream(client.inputStream))
@@ -174,26 +175,40 @@ class ScrcpyMirrorService : Service() {
         }
     }
 
-    private fun stageServer(destination: String) {
+    private fun bindShell(): IScrcpyShellService {
         check(ShizukuAccess.status.value.readyForShell) { "Shizuku not authorized" }
-        val staging = Shizuku.newProcess(
-            arrayOf("/system/bin/sh", "-c", "umask 077; cat > $destination"),
-            null, null
-        )
-        try {
-            assets.open("scrcpy-server-v3.3.4").use { source ->
-                staging.outputStream.use { sink -> source.copyTo(sink) }
+        val latch = CountDownLatch(1)
+        var remote: IScrcpyShellService? = null
+        val connection = object : ServiceConnection {
+            override fun onServiceConnected(name: ComponentName, binder: IBinder) {
+                remote = IScrcpyShellService.Stub.asInterface(binder)
+                latch.countDown()
             }
-            check(staging.waitFor() == 0) { "scrcpy server staging failed" }
-        } finally {
-            staging.destroy()
+            override fun onServiceDisconnected(name: ComponentName) {
+                shell = null
+                latch.countDown()
+            }
         }
+        shellConnection = connection
+        Shizuku.bindUserService(shellArgs, connection)
+        check(latch.await(12, TimeUnit.SECONDS)) { "Shizuku UserService connection timed out" }
+        val bridge = remote ?: error("LocalAdb Shizuku UserService unavailable")
+        check(bridge.processUid == 2000 || bridge.processUid == 0) {
+            "Shizuku UserService did not run as shell/root"
+        }
+        shell = bridge
+        return bridge
     }
 
     override fun onDestroy() {
         job?.cancel()
         runCatching { socket?.close() }
-        runCatching { remote?.destroy() }
+        runCatching { shell?.stopServer() }
+        shellConnection?.let { connection ->
+            runCatching { Shizuku.unbindUserService(shellArgs, connection, true) }
+        }
+        shell = null
+        shellConnection = null
         runCatching { decoder?.stop() }
         runCatching { decoder?.release() }
         decoder = null
