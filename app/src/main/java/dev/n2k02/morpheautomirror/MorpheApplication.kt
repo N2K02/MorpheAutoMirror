@@ -22,6 +22,7 @@ class MorpheApplication : Application() {
         c.type.removeObserver(o)
         activeConnection = false
         MirrorGateway.carAvailable.value = false
+        MirrorGateway.carSession(false)
     }
     override fun onCreate() {
         super.onCreate()
@@ -31,6 +32,11 @@ class MorpheApplication : Application() {
         val o = Observer<Int> { mode ->
             MirrorGateway.carAvailable.value = mode == CarConnection.CONNECTION_TYPE_PROJECTION ||
                 mode == CarConnection.CONNECTION_TYPE_NATIVE
+            if (!MirrorGateway.carAvailable.value) {
+                // Do not keep capturing to a stale Android Auto surface after disconnect.
+                MirrorGateway.detach()
+                MirrorGateway.carSession(false)
+            }
             AppLog.add("CAR", "Connection state changed: ${if (MirrorGateway.carAvailable.value) "connected" else "disconnected"}")
         }
         connection = car
