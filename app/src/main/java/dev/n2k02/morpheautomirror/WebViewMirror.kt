@@ -17,6 +17,7 @@ internal class WebViewMirror(private val context: Context, private val port: Int
     private val displayManager = context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
     private var display: VirtualDisplay? = null
     private var presentation: Presentation? = null
+    private var browser: WebView? = null
 
     fun attach(target: CarTarget) {
         detach()
@@ -26,6 +27,7 @@ internal class WebViewMirror(private val context: Context, private val port: Int
         display = virtualDisplay
         val dialog = Presentation(context, virtualDisplay.display)
         val browser = WebView(dialog.context)
+        this.browser = browser
         browser.setBackgroundColor(Color.BLACK)
         browser.settings.javaScriptEnabled = false
         browser.settings.allowFileAccess = false
@@ -43,6 +45,11 @@ internal class WebViewMirror(private val context: Context, private val port: Int
     }
 
     fun detach() {
+        // Close the MJPEG request and renderer before releasing its output display.
+        browser?.stopLoading()
+        browser?.loadUrl("about:blank")
+        browser?.destroy()
+        browser = null
         presentation?.dismiss()
         presentation = null
         display?.release()
