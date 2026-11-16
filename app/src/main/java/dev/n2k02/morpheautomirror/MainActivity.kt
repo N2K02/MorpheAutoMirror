@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.widget.ImageView
 import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.Bundle
@@ -14,6 +15,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -61,15 +63,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import android.os.SystemClock
 import kotlinx.coroutines.delay
 import androidx.core.content.ContextCompat
+import androidx.core.app.NotificationManagerCompat
 import dev.n2k02.theme.N2K02Theme
 import dev.n2k02.updater.N2K02UpdateScreen
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -78,6 +84,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 class MainActivity : ComponentActivity() {
     companion object { const val ACTION_CAPTURE = "dev.n2k02.morpheautomirror.CAPTURE" }
     private val actionCapture = MutableStateFlow(false)
+    private val uiRefresh = MutableStateFlow(0)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         MirrorGateway.init(this)
@@ -93,6 +100,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         LiveUpdater.onResume(this)
+        uiRefresh.value = uiRefresh.value + 1
     }
     private fun quit() {
         MirrorGateway.quit()
@@ -119,7 +127,19 @@ class MainActivity : ComponentActivity() {
         BackHandler(enabled = page != "Home") { page = PageNavigation.parent(page) }
         var monitoring by remember { mutableStateOf(MirrorGateway.prefs.enabled) }
         var webView by remember { mutableStateOf(MirrorGateway.prefs.webViewMode) }
-        var packageName by remember { mutableStateOf(MirrorGateway.prefs.morphePackage) }
+        var installedMorphe by remember { mutableStateOf<String?>(null) }
+        var listenerPermission by remember { mutableStateOf(false) }
+        val refresh by uiRefresh.collectAsState()
+        LaunchedEffect(refresh) {
+            listenerPermission = NotificationManagerCompat.getEnabledListenerPackages(this@MainActivity)
+                .contains(this@MainActivity.packageName)
+            val found = MorpheAppDiscovery.find(this@MainActivity)
+            installedMorphe = found
+            if (found != null && found != MirrorGateway.prefs.morphePackage) {
+                MirrorGateway.prefs.morphePackage = found
+                MorpheNotificationListener.refreshPackage()
+            }
+        }
         var captureAttempted by remember { mutableStateOf(false) }
         val launchCapture = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == RESULT_OK && result.data != null) {
@@ -173,8 +193,8 @@ class MainActivity : ComponentActivity() {
                     Icon(icon, null)
                     Text(page, style = MaterialTheme.typography.titleLarge,
                         modifier = Modifier.weight(1f).padding(start = 8.dp))
-                    Icon(painterResource(R.drawable.ic_launcher_foreground), null,
-                        modifier = Modifier.size(30.dp), tint = androidx.compose.ui.graphics.Color.Unspecified)
+                    Icon(painterResource(R.drawable.ic_header_screen), null,
+                        modifier = Modifier.size(34.dp), tint = androidx.compose.ui.graphics.Color.Unspecified)
                     Text("MorpheAutoMirror", style = MaterialTheme.typography.labelMedium)
                 }
             },
@@ -219,6 +239,8 @@ class MainActivity : ComponentActivity() {
                                         listenerStarted != null && s.monitoring)
                                 }
                                 HomeStatusRow("Monitoring", if (s.monitoring) "Enabled" else "Disabled")
+                                HomeStatusRow("Morphe app", if (installedMorphe != null) "Installed" else "Not installed")
+                                HomeStatusRow("Listener access", if (listenerPermission) "Granted" else "Not granted")
                                 HomeStatusRow("Connected for",
                                     if (s.monitoring) ListenerUptime.format(listenerStarted, uptimeNow) else "Not monitoring")
                                 HomeStatusRow("Media session", if (sessionFound) "Detected" else "Not detected")
@@ -286,7 +308,7 @@ class MainActivity : ComponentActivity() {
                         Text("Preferences", style = MaterialTheme.typography.titleMedium)
                         ListItem(
                             headlineContent = { Text("Playback monitoring") },
-                            supportingContent = { Text("Morphe listener and package settings") },
+                            supportingContent = { Text("Automatic app detection and notification access") },
                             leadingContent = { Icon(Icons.Rounded.PlayCircle, null) },
                             trailingContent = { Icon(Icons.Rounded.ChevronRight, null) },
                             modifier = Modifier.fillMaxWidth().clickable { page = "Monitoring" }
@@ -310,24 +332,102 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     "Monitoring" -> {
-                        ListItem(headlineContent = { Text("Automatic Morphe listener") },
-                            supportingContent = { Text("Monitor only the configured Morphe media session") },
-                            leadingContent = { Icon(Icons.Rounded.PlayCircle, null) },
-                            trailingContent = { Switch(checked = monitoring, onCheckedChange = {
-                                monitoring = it
-                                MirrorGateway.monitoring(it)
-                            }) })
-                        OutlinedTextField(value = packageName, onValueChange = { packageName = it },
-                            label = { Text("Morphe package name") }, singleLine = true,
-                            modifier = Modifier.fillMaxWidth())
-                        Button(onClick = { MirrorGateway.prefs.morphePackage = packageName }) {
-                            Text("Save package")
+                        val readiness = MonitoringStatus.label(
+                            monitoring, installedMorphe != null,
+                            listenerPermission, listenerStarted != null
+                        )
+                        Text(
+                            "Configure automatic monitoring and required access for Morphe playback detection.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            HomeBadge(readiness, readiness == "Monitoring active")
                         }
-                        Text("Grant notification listener access for playback detection.",
-                            style = MaterialTheme.typography.bodySmall)
-                        Button(onClick = {
-                            startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-                        }) { Text("Notification listener access") }
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+                        ) {
+                            Row(
+                                Modifier.fillMaxWidth().padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                MonitoringIconTile { Icon(Icons.Rounded.PlayCircle, contentDescription = null) }
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text("Automatic Morphe listener", style = MaterialTheme.typography.titleMedium)
+                                    Text("Detect Morphe playback without polling.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Switch(
+                                    checked = monitoring,
+                                    onCheckedChange = { enabled ->
+                                        monitoring = enabled
+                                        MirrorGateway.monitoring(enabled)
+                                    }
+                                )
+                            }
+                        }
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+                        ) {
+                            Row(
+                                Modifier.fillMaxWidth().padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                MorpheInstalledIcon(installedMorphe, refresh)
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text("Morphe app detection", style = MaterialTheme.typography.titleMedium)
+                                    Text(
+                                        if (installedMorphe != null) "Morphe YouTube detected automatically"
+                                        else "Morphe YouTube is not installed or not visible",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                HomeBadge(if (installedMorphe != null) "Installed" else "Not installed",
+                                    installedMorphe != null)
+                            }
+                        }
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+                        ) {
+                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Row(
+                                    Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    MonitoringIconTile {
+                                        Icon(Icons.Rounded.NotificationsActive, contentDescription = null)
+                                    }
+                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Text("Notification listener access",
+                                            style = MaterialTheme.typography.titleMedium)
+                                        Text("Required to detect Morphe playback events",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    HomeBadge(if (listenerPermission) "Granted" else "Not granted",
+                                        listenerPermission)
+                                }
+                                if (!listenerPermission) {
+                                    Button(
+                                        onClick = {
+                                            startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                                        },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) { Text("Grant access") }
+                                }
+                            }
+                        }
                     }
                     "Rendering" -> {
                         ListItem(headlineContent = { Text("Experimental WebView renderer") },
@@ -376,5 +476,36 @@ private fun HomeBadge(label: String, active: Boolean) {
             style = MaterialTheme.typography.labelSmall,
             color = if (active) MaterialTheme.colorScheme.onTertiaryContainer
                 else MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun MonitoringIconTile(content: @Composable () -> Unit) {
+    Surface(
+        modifier = Modifier.size(54.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+    ) {
+        Box(contentAlignment = Alignment.Center) { content() }
+    }
+}
+
+@Composable
+private fun MorpheInstalledIcon(packageName: String?, refresh: Int) {
+    val context = LocalContext.current
+    val icon = remember(packageName, refresh) {
+        packageName?.let { name ->
+            runCatching { context.packageManager.getApplicationIcon(name) }.getOrNull()
+        }
+    }
+    if (icon == null) {
+        MonitoringIconTile { Icon(Icons.Rounded.PlayCircle, contentDescription = "Morphe YouTube") }
+    } else {
+        AndroidView(
+            factory = { ctx -> ImageView(ctx).apply { scaleType = ImageView.ScaleType.FIT_CENTER } },
+            update = { image -> image.setImageDrawable(icon) },
+            modifier = Modifier.size(54.dp).clip(RoundedCornerShape(16.dp))
+        )
     }
 }
