@@ -22,3 +22,13 @@ dependencyResolutionManagement {
 rootProject.name = "MorpheAutoMirror"
 include(":app")
 
+
+if (providers.gradleProperty("useSharedSources").orNull == "true") {
+    // Public, reproducible source builds let CI test even before a Packages token exists.
+    includeBuild("shared/n2k02theme") {
+        dependencySubstitution { substitute(module("dev.n2k02:theme")).using(project(":theme")) }
+    }
+    includeBuild("shared/n2k02updater") {
+        dependencySubstitution { substitute(module("dev.n2k02:updater")).using(project(":updater")) }
+    }
+}

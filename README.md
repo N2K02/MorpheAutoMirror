@@ -28,14 +28,14 @@ Tests run on every PR and main commit. One reusable experimental PR is used per 
 
 `SIGNING_KEYSTORE_BASE64`, `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS`, `SIGNING_KEY_PASSWORD`.
 
-Also configure `N2K02_PACKAGES_TOKEN` to download the shared N2K02 theme and updater from GitHub Packages. These credentials are read by CI only and are never checked into source. Use the same keystore for **all versions of this app** (do not inadvertently change the certificate after installing). Experimental APKs have `-experimental.<run>` version suffix; merged main creates the next numbered stable release. Review CI before merging.
+The CI checks out the public shared N2K02 theme/updater and uses Gradle composite builds, so no package token is required for verification or release compilation. A `N2K02_PACKAGES_TOKEN` can be used for Maven builds instead. These credentials are read by CI only and are never checked into source. Use the same keystore for **all versions of this app** (do not inadvertently change the certificate after installing). Experimental APKs have `-experimental.<run>` version suffix; merged main creates the next numbered stable release. Review CI before merging.
 
 ## Local build
 
-Requires Java 17, Gradle 9.9, Android SDK 36, and `N2K02_PACKAGES_TOKEN` environment variable.
+Requires Java 17, Gradle 9.9, Android SDK 37. Clone the public theme/updater repositories into `shared/n2k02theme` and `shared/n2k02updater` (or use a GitHub Packages token).
 
 ```bash
-gradle :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+gradle :app:testDebugUnitTest :app:lintDebug :app:assembleDebug -PuseSharedSources=true
 ```
 
 No claim of physical-head-unit testing is made until verified on an actual car.

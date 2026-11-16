@@ -31,14 +31,20 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '9.9.0'
-      - name: Check private package credentials
-        run: |
-          if [ -z "$N2K02_PACKAGES_TOKEN" ]; then
-            echo "::error::Add N2K02_PACKAGES_TOKEN to Actions secrets"
-            exit 1
-          fi
+      - name: Checkout shared N2K02 theme
+        uses: actions/checkout@v7
+        with:
+          repository: N2K02/n2k02theme
+          path: shared/n2k02theme
+          persist-credentials: false
+      - name: Checkout shared N2K02 updater
+        uses: actions/checkout@v7
+        with:
+          repository: N2K02/n2k02updater
+          path: shared/n2k02updater
+          persist-credentials: false
       - name: Kotlin unit tests, Android lint and debug build
-        run: gradle --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+        run: gradle --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug -PuseSharedSources=true
       - uses: actions/upload-artifact@v7
         with:
           name: MorpheAutoMirror-debug-${{ github.run_number }}
@@ -66,6 +72,18 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '9.9.0'
+      - name: Checkout shared theme for release
+        uses: actions/checkout@v7
+        with:
+          repository: N2K02/n2k02theme
+          path: shared/n2k02theme
+          persist-credentials: false
+      - name: Checkout shared updater for release
+        uses: actions/checkout@v7
+        with:
+          repository: N2K02/n2k02updater
+          path: shared/n2k02updater
+          persist-credentials: false
       - name: Validate signing availability
         run: |
           set -euo pipefail
@@ -113,7 +131,7 @@ jobs:
           mkdir -p signing
           printf '%s' "$SIGNING_KEYSTORE_BASE64" | base64 -d > signing/release.jks
           chmod 600 signing/release.jks
-          gradle --no-daemon :app:testDebugUnitTest :app:assembleRelease -PappVersion="$VERSION" -PappVersionCode="$VERSION_CODE" -PappVersionSuffix="$VERSION_SUFFIX"
+          gradle --no-daemon :app:testDebugUnitTest :app:assembleRelease -PappVersion="$VERSION" -PappVersionCode="$VERSION_CODE" -PappVersionSuffix="$VERSION_SUFFIX" -PuseSharedSources=true
           cp app/build/outputs/apk/release/app-release.apk "$APK_NAME.apk"
           TOOLS=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
           "$TOOLS/apksigner" verify --print-certs "$APK_NAME.apk"

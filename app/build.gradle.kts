@@ -6,7 +6,7 @@ val appVersion = (findProperty("appVersion") as String?) ?: "1.0"
 require(Regex("""\d+\.\d""").matches(appVersion))
 android {
     namespace = "dev.n2k02.morpheautomirror"
-    compileSdk = 36
+    compileSdk = 37
     defaultConfig {
         applicationId = "dev.n2k02.morpheautomirror"
         minSdk = 26
