@@ -8,10 +8,12 @@ import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,6 +27,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.DirectionsCar
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Info
@@ -54,6 +59,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -98,7 +104,8 @@ class MainActivity : ComponentActivity() {
         val error by MirrorGateway.lastError.collectAsState()
         val lines by AppLog.lines.collectAsState()
         val experimental by LiveUpdater.experimentalEnabled.collectAsState()
-        var page by remember { mutableStateOf("Home") }
+        var page by rememberSaveable { mutableStateOf("Home") }
+        BackHandler(enabled = page != "Home") { page = PageNavigation.parent(page) }
         var monitoring by remember { mutableStateOf(MirrorGateway.prefs.enabled) }
         var webView by remember { mutableStateOf(MirrorGateway.prefs.webViewMode) }
         var packageName by remember { mutableStateOf(MirrorGateway.prefs.morphePackage) }
@@ -140,8 +147,8 @@ class MainActivity : ComponentActivity() {
             topBar = {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically) {
-                    if (page != "Home" && page != "Settings") {
-                        IconButton(onClick = { page = "Settings" }) {
+                    if (page != "Home") {
+                        IconButton(onClick = { page = PageNavigation.parent(page) }) {
                             Icon(Icons.Rounded.ArrowBack, "Back")
                         }
                     }
@@ -149,6 +156,8 @@ class MainActivity : ComponentActivity() {
                         "Home" -> Icons.Rounded.Home
                         "Logs" -> Icons.Rounded.List
                         "Updates" -> Icons.Rounded.Update
+                        "Monitoring" -> Icons.Rounded.NotificationsActive
+                        "Rendering" -> Icons.Rounded.Tune
                         else -> Icons.Rounded.Settings
                     }
                     Icon(icon, null)
@@ -207,21 +216,63 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     "Settings" -> {
-                        Text("Playback monitoring", style = MaterialTheme.typography.titleMedium)
+                        Text("Preferences", style = MaterialTheme.typography.titleMedium)
+                        ListItem(
+                            headlineContent = { Text("Playback monitoring") },
+                            supportingContent = { Text("Morphe listener and package settings") },
+                            leadingContent = { Icon(Icons.Rounded.PlayCircle, null) },
+                            trailingContent = { Icon(Icons.Rounded.ChevronRight, null) },
+                            modifier = Modifier.fillMaxWidth().clickable { page = "Monitoring" }
+                        )
+                        HorizontalDivider()
+                        ListItem(
+                            headlineContent = { Text("Video rendering") },
+                            supportingContent = { Text("Direct surface or experimental WebView") },
+                            leadingContent = { Icon(Icons.Rounded.Tune, null) },
+                            trailingContent = { Icon(Icons.Rounded.ChevronRight, null) },
+                            modifier = Modifier.fillMaxWidth().clickable { page = "Rendering" }
+                        )
+                        HorizontalDivider()
+                        Text("Diagnostics & updates", style = MaterialTheme.typography.titleMedium)
+                        ListItem(
+                            headlineContent = { Text("Logs") },
+                            supportingContent = { Text("View, copy and share diagnostics") },
+                            leadingContent = { Icon(Icons.Rounded.List, null) },
+                            trailingContent = { Icon(Icons.Rounded.ChevronRight, null) },
+                            modifier = Modifier.fillMaxWidth().clickable { page = "Logs" }
+                        )
+                        HorizontalDivider()
+                        ListItem(
+                            headlineContent = { Text("Updates") },
+                            supportingContent = { Text("Stable and experimental releases") },
+                            leadingContent = { Icon(Icons.Rounded.Update, null) },
+                            trailingContent = { Icon(Icons.Rounded.ChevronRight, null) },
+                            modifier = Modifier.fillMaxWidth().clickable { page = "Updates" }
+                        )
+                    }
+                    "Monitoring" -> {
                         ListItem(headlineContent = { Text("Automatic Morphe listener") },
-                            supportingContent = { Text("Only the configured Morphe media session") },
+                            supportingContent = { Text("Monitor only the configured Morphe media session") },
                             leadingContent = { Icon(Icons.Rounded.PlayCircle, null) },
                             trailingContent = { Switch(checked = monitoring, onCheckedChange = {
-                                monitoring = it; MirrorGateway.monitoring(it)
+                                monitoring = it
+                                MirrorGateway.monitoring(it)
                             }) })
                         OutlinedTextField(value = packageName, onValueChange = { packageName = it },
                             label = { Text("Morphe package name") }, singleLine = true,
                             modifier = Modifier.fillMaxWidth())
-                        TextButton(onClick = { MirrorGateway.prefs.morphePackage = packageName }) {
+                        Button(onClick = { MirrorGateway.prefs.morphePackage = packageName }) {
                             Text("Save package")
                         }
+                        Text("Grant notification listener access for playback detection.",
+                            style = MaterialTheme.typography.bodySmall)
+                        Button(onClick = {
+                            startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                        }) { Text("Notification listener access") }
+                    }
+                    "Rendering" -> {
                         ListItem(headlineContent = { Text("Experimental WebView renderer") },
-                            supportingContent = { Text("MJPEG via local WebView, max 640 × 360, 5 fps. Direct surface is faster.") },
+                            supportingContent = { Text("MJPEG via local WebView, 640 × 360 at 5 fps. Direct surface is faster.") },
                             leadingContent = { Icon(Icons.Rounded.AutoAwesome, null) },
                             trailingContent = { Switch(checked = webView, onCheckedChange = {
                                 webView = it
@@ -229,15 +280,8 @@ class MainActivity : ComponentActivity() {
                                 MirrorGateway.parked(false)
                                 MirrorGateway.stopCapture()
                             }) })
-                        HorizontalDivider()
-                        Text("Diagnostics & updates", style = MaterialTheme.typography.titleMedium)
-                        ListItem(headlineContent = { Text("Logs") }, supportingContent = { Text("View, copy and clear diagnostics") },
-                            leadingContent = { Icon(Icons.Rounded.List, null) },
-                            modifier = Modifier.fillMaxWidth())
-                        Button(onClick = { page = "Logs" }) { Text("Open logs") }
-                        ListItem(headlineContent = { Text("Updates") }, supportingContent = { Text("Stable and experimental channels") },
-                            leadingContent = { Icon(Icons.Rounded.Update, null) })
-                        Button(onClick = { page = "Updates" }) { Text("Open updates") }
+                        Text("Video capture requires permission for each session. Mirroring is parked-only.",
+                            style = MaterialTheme.typography.bodySmall)
                     }
                     "Logs" -> {
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
