@@ -50,7 +50,6 @@ private class CarMirrorScreen(carContext: CarContext) : Screen(carContext), Defa
         override fun onSurfaceDestroyed(container: SurfaceContainer) {
             MirrorGateway.detach()
             heldSurface = null
-            container.surface?.release()
         }
     }
     init { lifecycle.addObserver(this) }
@@ -63,7 +62,6 @@ private class CarMirrorScreen(carContext: CarContext) : Screen(carContext), Defa
     override fun onStop(owner: LifecycleOwner) {
         MirrorGateway.detach()
         MirrorGateway.carSession(false)
-        runCatching { carContext.getCarService(AppManager::class.java).setSurfaceCallback(null) }
     }
     override fun onGetTemplate(): Template {
         val strip = ActionStrip.Builder()
