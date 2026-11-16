@@ -13,7 +13,7 @@ import android.webkit.WebView
  * WebView rendered on a private virtual display whose output is Android Auto's surface.
  * The HTML is static and renders a local loopback image stream only.
  */
-internal class WebViewMirror(private val context: Context, private val port: Int) : AutoCloseable {
+internal class WebViewMirror(private val context: Context, private val port: Int, private val token: String) : AutoCloseable {
     private val displayManager = context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
     private var display: VirtualDisplay? = null
     private var presentation: Presentation? = null
@@ -35,7 +35,7 @@ internal class WebViewMirror(private val context: Context, private val port: Int
         val html = """<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1">
             <style>body{margin:0;background:#000;display:grid;place-items:center;height:100vh}
             img{width:100vw;height:100vh;object-fit:contain}</style>
-            <img src="http://127.0.0.1:$port/stream" alt="Morphe screen">"""
+            <img src="http://127.0.0.1:$port/stream?token=$token" alt="Morphe screen">"""
         browser.loadDataWithBaseURL("http://127.0.0.1:$port/", html, "text/html", "utf-8", null)
         dialog.setContentView(browser)
         dialog.show()
