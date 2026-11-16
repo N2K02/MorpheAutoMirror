@@ -98,6 +98,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         LiveUpdater.onResume(this)
+        ShizukuAccess.refresh()
         uiRefresh.value = uiRefresh.value + 1
     }
     private fun quit() {
@@ -110,6 +111,7 @@ class MainActivity : ComponentActivity() {
         val s by MirrorGateway.state.collectAsState()
         val available by MirrorGateway.carAvailable.collectAsState()
         val error by MirrorGateway.lastError.collectAsState()
+        val shizuku by ShizukuAccess.status.collectAsState()
         val experimental by LiveUpdater.experimentalEnabled.collectAsState()
         var page by rememberSaveable { mutableStateOf("Home") }
         val listenerStarted by MirrorGateway.listenerConnectedAt.collectAsState()
@@ -184,13 +186,14 @@ class MainActivity : ComponentActivity() {
                         "Home" -> Icons.Rounded.Home
                         "Updates" -> Icons.Rounded.Update
                         "Monitoring" -> Icons.Rounded.NotificationsActive
+                        "Shizuku" -> Icons.Rounded.Tune
                         else -> Icons.Rounded.Settings
                     }
                     Icon(icon, null)
                     Text(page, style = MaterialTheme.typography.titleLarge,
                         modifier = Modifier.weight(1f).padding(start = 8.dp))
                     Icon(painterResource(R.drawable.ic_header_screen), null,
-                        modifier = Modifier.size(34.dp), tint = androidx.compose.ui.graphics.Color.Unspecified)
+                        modifier = Modifier.size(24.dp), tint = androidx.compose.ui.graphics.Color.Unspecified)
                     Text("MorpheAutoMirror", style = MaterialTheme.typography.labelMedium)
                 }
             },
@@ -272,6 +275,7 @@ class MainActivity : ComponentActivity() {
                                     HomeBadge(if (s.capturing) "ACTIVE" else "INACTIVE", s.capturing)
                                 }
                                 HomeStatusRow("Renderer", "Direct surface")
+                                HomeStatusRow("Optional Shizuku", shizuku.label)
                                 HomeStatusRow("Capture", if (s.permissionGranted) "Granted" else "Not granted")
                                 Text("Capture permission is required per session. Audio stays in Morphe.",
                                     style = MaterialTheme.typography.bodySmall)
@@ -295,6 +299,13 @@ class MainActivity : ComponentActivity() {
                             leadingContent = { Icon(Icons.Rounded.PlayCircle, null) },
                             trailingContent = { Icon(Icons.Rounded.ChevronRight, null) },
                             modifier = Modifier.fillMaxWidth().clickable { page = "Monitoring" }
+                        )
+                        ListItem(
+                            headlineContent = { Text("Shizuku access") },
+                            supportingContent = { Text("LocalAdb shell permission status for scrcpy experiments") },
+                            leadingContent = { Icon(Icons.Rounded.Tune, null) },
+                            trailingContent = { Icon(Icons.Rounded.ChevronRight, null) },
+                            modifier = Modifier.fillMaxWidth().clickable { page = "Shizuku" }
                         )
                         HorizontalDivider()
                         Text("Updates", style = MaterialTheme.typography.titleMedium)
@@ -403,6 +414,30 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         }
+                    }
+                    "Shizuku" -> {
+                        Text("LocalAdb embedded Shizuku", style = MaterialTheme.typography.titleMedium)
+                        Text("Optional privileged access for scrcpy experiments. Installing LocalAdb does not automatically grant this app permission.",
+                            style = MaterialTheme.typography.bodyMedium)
+                        Card(Modifier.fillMaxWidth()) {
+                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                HomeStatusRow("Shizuku", shizuku.label)
+                                HomeBadge(if (shizuku.readyForShell) "SHELL AUTHORIZED" else "NOT AUTHORIZED", shizuku.readyForShell)
+                                if (!shizuku.binderAlive) {
+                                    Button(onClick = {
+                                        packageManager.getLaunchIntentForPackage("dev.n2k02.localadb")?.let(::startActivity)
+                                    }, modifier = Modifier.fillMaxWidth()) { Text("Open LocalAdb") }
+                                } else if (!shizuku.readyForShell) {
+                                    Button(onClick = { ShizukuAccess.request() },
+                                        enabled = !shizuku.deniedPermanently,
+                                        modifier = Modifier.fillMaxWidth()) { Text("Grant Shizuku permission") }
+                                }
+                                Button(onClick = { ShizukuAccess.refresh() },
+                                    modifier = Modifier.fillMaxWidth()) { Text("Recheck permission") }
+                            }
+                        }
+                        Text("Shizuku is not itself a video renderer. The current mirror uses MediaProjection; scrcpy needs a matching server and an H.264 decoder.",
+                            style = MaterialTheme.typography.bodySmall)
                     }
                     "Updates" -> {
                         N2K02UpdateScreen(
