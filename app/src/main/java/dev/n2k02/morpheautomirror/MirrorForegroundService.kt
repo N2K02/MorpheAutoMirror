@@ -15,7 +15,6 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.IBinder
-import android.view.Surface
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -34,9 +33,6 @@ class MirrorForegroundService : Service() {
     private val mainHandler = Handler(Looper.getMainLooper())
     private var projection: MediaProjection? = null
     private var virtualDisplay: VirtualDisplay? = null
-    private var gecko: GeckoViewMirror? = null
-    private var reader: FrameCaptureServer? = null
-    private var currentTarget: CarTarget? = null
     private var targetJob: Job? = null
     private var shuttingDown = false
 
@@ -125,36 +121,25 @@ class MirrorForegroundService : Service() {
         projection = p
         MirrorGateway.captureStarted()
         MirrorGateway.surface.value?.let { attach(it) }
-        AppLog.add("CAPTURE", "Projection acquired; mode=${if (MirrorGateway.prefs.geckoViewMode) "GeckoView" else "direct"}")
+        AppLog.add("CAPTURE", "Projection acquired; direct Android Auto surface")
     }
 
+    /** One MediaProjection virtual display, bound directly to Android Auto's Surface. */
     private fun attach(target: CarTarget) {
         if (target.width <= 0 || target.height <= 0) return
-        currentTarget = target
         val p = projection ?: return
         try {
-            if (MirrorGateway.prefs.geckoViewMode) {
-                if (reader == null) {
-                    val r = FrameCaptureServer()
-                    reader = r
-                    virtualDisplay = p.createVirtualDisplay("morphe-gecko-frames",
-                        r.width, r.height, r.dpi,
-                        DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-                        r.inputSurface, null, mainHandler)
-                }
-                if (gecko == null) gecko = GeckoViewMirror(this, reader!!.port, reader!!.accessToken)
-                gecko?.attach(target)
+            val display = virtualDisplay
+            if (display == null) {
+                virtualDisplay = p.createVirtualDisplay(
+                    "morphe-direct",
+                    target.width, target.height, target.dpi,
+                    DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                    target.surface, null, mainHandler
+                )
             } else {
-                val display = virtualDisplay
-                if (display == null) {
-                    virtualDisplay = p.createVirtualDisplay("morphe-direct",
-                        target.width, target.height, target.dpi,
-                        DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-                        target.surface, null, mainHandler)
-                } else {
-                    display.resize(target.width, target.height, target.dpi)
-                    display.setSurface(target.surface)
-                }
+                display.resize(target.width, target.height, target.dpi)
+                display.setSurface(target.surface)
             }
         } catch (e: Exception) {
             AppLog.add("CAPTURE", "Car render failed: ${e.javaClass.simpleName}")
@@ -165,22 +150,17 @@ class MirrorForegroundService : Service() {
     }
 
     private fun detach() {
-        currentTarget = null
-        if (MirrorGateway.prefs.geckoViewMode) gecko?.detach()
-        else virtualDisplay?.setSurface(null)
+        // Null surface prevents writing into a destroyed host surface.
+        virtualDisplay?.setSurface(null)
     }
 
     override fun onDestroy() {
         shuttingDown = true
         targetJob?.cancel()
         scope.cancel()
-        gecko?.close()
-        gecko = null
         virtualDisplay?.setSurface(null)
         virtualDisplay?.release()
         virtualDisplay = null
-        reader?.close()
-        reader = null
         projection?.unregisterCallback(projectionListener)
         projection?.stop()
         projection = null
