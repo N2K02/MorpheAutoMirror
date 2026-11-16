@@ -28,6 +28,7 @@ class MorpheApplication : Application() {
         super.onCreate()
         MirrorGateway.init(this)
         LiveUpdater.init(this)
+        ShizukuAccess.initialize()
         val car = CarConnection(this)
         val o = Observer<Int> { mode ->
             MirrorGateway.carConnection(mode == CarConnection.CONNECTION_TYPE_PROJECTION ||
@@ -45,6 +46,7 @@ class MorpheApplication : Application() {
     }
     override fun onTerminate() {
         stopConnectionMonitoring()
+        ShizukuAccess.shutdown()
         super.onTerminate()
     }
 }
