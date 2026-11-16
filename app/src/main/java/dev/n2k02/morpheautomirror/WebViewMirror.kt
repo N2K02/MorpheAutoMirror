@@ -47,11 +47,10 @@ internal class WebViewMirror(private val context: Context, private val port: Int
     fun detach() {
         // Close the MJPEG request and renderer before releasing its output display.
         browser?.stopLoading()
-        browser?.loadUrl("about:blank")
-        browser?.destroy()
-        browser = null
         presentation?.dismiss()
         presentation = null
+        browser?.destroy()
+        browser = null
         display?.release()
         display = null
     }
