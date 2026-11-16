@@ -43,6 +43,7 @@ class MirrorForegroundService : Service() {
     private val projectionListener = object : MediaProjection.Callback() {
         override fun onStop() {
             AppLog.add("CAPTURE", "MediaProjection revoked")
+            MirrorGateway.parked(false)
             MirrorGateway.captureStopped("Capture permission ended")
             stopSelf()
         }
@@ -73,6 +74,7 @@ class MirrorForegroundService : Service() {
                     beginProjection(intent)
                 } catch (e: Exception) {
                     AppLog.add("CAPTURE", "Cannot start capture: ${e.javaClass.simpleName}")
+                    MirrorGateway.parked(false)
                     MirrorGateway.captureStopped("Capture unavailable: ${e.javaClass.simpleName}")
                     stopSelf()
                 }
@@ -156,6 +158,7 @@ class MirrorForegroundService : Service() {
             }
         } catch (e: Exception) {
             AppLog.add("CAPTURE", "Car render failed: ${e.javaClass.simpleName}")
+            MirrorGateway.parked(false)
             MirrorGateway.captureStopped("Car render failed: ${e.javaClass.simpleName}")
             stopSelf()
         }
