@@ -1,9 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-<path android:fillColor="#3B82F6" android:pathData="M18,30h72v45H18z"/>
-<path android:fillColor="#111827" android:pathData="M24,36h60v33H24z"/>
-<path android:fillColor="#FACC15" android:pathData="M46,40l21,13 -21,13z"/>
-<path android:strokeColor="#FFFFFF" android:strokeWidth="3" android:fillColor="@android:color/transparent"
-android:pathData="M38,80h32 M54,69v11"/>
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- Rounded display, contrasting cinema screen and integrated play mark. -->
+    <path android:fillColor="#1D4ED8"
+        android:pathData="M24,28 L84,28 Q91,28 91,35 L91,70 Q91,77 84,77 L24,77 Q17,77 17,70 L17,35 Q17,28 24,28 Z"/>
+    <path android:fillColor="#93C5FD"
+        android:pathData="M26,36 L82,36 Q84,36 84,38 L84,67 Q84,69 82,69 L26,69 Q24,69 24,67 L24,38 Q24,36 26,36 Z"/>
+    <path android:fillColor="#0F172A"
+        android:pathData="M28,40 L80,40 L80,65 L28,65 Z"/>
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M45,42 L45,63 L65,52.5 Z"/>
+    <path android:fillColor="#60A5FA"
+        android:pathData="M46,79 L62,79 L66,85 L42,85 Z"/>
+    <path android:strokeColor="#BFDBFE" android:strokeWidth="2.5"
+        android:strokeLineCap="round" android:fillColor="#00000000"
+        android:pathData="M75,21 Q87,22 91,33"/>
 </vector>
