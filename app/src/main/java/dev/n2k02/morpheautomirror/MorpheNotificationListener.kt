@@ -74,7 +74,12 @@ class MorpheNotificationListener : NotificationListenerService() {
         publish(chosen?.playbackState)
     }
     private fun publish(playback: PlaybackState?) {
-        MirrorGateway.playing(MirrorGateway.prefs.enabled && playback?.state == PlaybackState.STATE_PLAYING)
+        val enabled = MirrorGateway.prefs.enabled
+        // Observe Morphe only. Never dispatch play/pause commands to its MediaController.
+        MirrorGateway.playing(
+            value = enabled && playback?.state == PlaybackState.STATE_PLAYING,
+            paused = enabled && playback?.state == PlaybackState.STATE_PAUSED
+        )
     }
     private fun stopObserving() {
         if (observing) sessionManager?.removeOnActiveSessionsChangedListener(sessions)
