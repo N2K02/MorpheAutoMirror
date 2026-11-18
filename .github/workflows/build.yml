@@ -164,6 +164,7 @@ jobs:
           set -euo pipefail
           python3 .github/scripts/experimental_naming.py --self-test
           python3 .github/scripts/experimental_naming.py "$GITHUB_REPOSITORY" MorpheAutoMirror "$GITHUB_RUN_NUMBER" "${{ github.event.pull_request.number }}"
+          echo "APK_NAME=MorpheAutoMirror-SHIZUKU-$VERSION-experimental.$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
       - name: Label experimental release notes
         if: github.event_name == 'pull_request' && env.SIGNING_READY == 'true'
         run: |
