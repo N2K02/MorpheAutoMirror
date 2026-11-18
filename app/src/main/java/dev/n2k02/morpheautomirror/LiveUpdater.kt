@@ -30,7 +30,7 @@ internal object LiveUpdater {
         context = app,
         config = UpdateConfig(repository = "N2K02/MorpheAutoMirror",
             packageName = app.packageName, installedVersionCode = versionCode(),
-            experimentalEnabled = experimentalEnabled.value),
+            experimentalEnabled = experimentalEnabled.value, releaseTrack = "shizuku"),
         offerPreferences = prefs()
     )
     val controller: UpdaterController get() = checkNotNull(current)
