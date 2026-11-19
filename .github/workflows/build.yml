@@ -121,7 +121,8 @@ jobs:
             [[ "$(printf '%s\n%s\n' "$last" "$ver" | sort -V | tail -1)" == "$ver" && "$ver" != "$last" ]] || { echo "::error::Stable version must advance from $last"; exit 1; }
           fi
           echo "VERSION=$ver" >> "$GITHUB_ENV"
-          echo "VERSION_CODE=$(python3 .github/scripts/version_code.py "$GITHUB_REPOSITORY" "$GITHUB_RUN_NUMBER")" >> "$GITHUB_ENV"
+          code=$(python3 .github/scripts/version_code.py "$GITHUB_REPOSITORY" "$GITHUB_RUN_NUMBER")
+          echo "VERSION_CODE=$code" >> "$GITHUB_ENV"
           echo "VERSION_SUFFIX=" >> "$GITHUB_ENV"
           echo "APK_NAME=MorpheAutoMirror-ADB-$ver" >> "$GITHUB_ENV"
           prev=""
@@ -130,7 +131,7 @@ jobs:
           changes=$(git log --no-merges --pretty='- %s' "$range" | head -40 || true)
           {
             echo "## MorpheAutoMirror $ver"
-            echo "Version code: $(python3 .github/scripts/version_code.py "$GITHUB_REPOSITORY" "$GITHUB_RUN_NUMBER")"
+            echo "Version code: $code"
             echo
             echo "### What's new"
             echo "${changes:-- Rebuild, no code changes}"
@@ -217,3 +218,9 @@ jobs:
             gh release create "$TAG" "$APK_NAME.apk" --repo "$GITHUB_REPOSITORY" --target "$TARGET" --title "$TITLE" --notes-file release-notes.md "${EXTRA[@]}"
           fi
 
+  download-index:
+    needs: release
+    if: github.event_name == 'pull_request_target' || (github.event_name == 'pull_request' && !github.event.pull_request.draft)
+    permissions:
+      contents: write
+    uses: N2K02/n2k02updater/.github/workflows/index-downloads.yml@ae58c3ce0196b1b30d214927dd529ce5d779febf

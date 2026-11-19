@@ -9,15 +9,12 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.media.MediaCodec
 import android.media.MediaFormat
-import android.net.LocalSocket
-import android.net.LocalSocketAddress
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -26,10 +23,11 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runInterruptible
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.withContext
 import java.io.BufferedInputStream
 import java.io.DataInputStream
-import java.io.IOException
 import java.security.SecureRandom
 import java.util.Locale
 
@@ -40,7 +38,7 @@ import java.util.Locale
  */
 class ScrcpyMirrorService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    @Volatile private var socket: LocalSocket? = null
+    @Volatile private var videoTunnel: AdbScrcpyTunnel? = null
     private var job: Job? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -104,26 +102,19 @@ class ScrcpyMirrorService : Service() {
         val scid = String.format(Locale.ROOT, "%08x", id)
         val session = AdbScrcpySession(scid, IntegratedAdb.core::execVerified)
         val asset = assets.open("scrcpy-server-v3.3.4").use { it.readBytes() }
-        val client = LocalSocket()
-        socket = client
+        val port = IntegratedAdb.core.preferences.lastTlsPort()
+            ?: error("No verified Wireless debugging port")
+        val tunnel = AdbScrcpyTunnel(applicationContext)
+        videoTunnel = tunnel
         try {
             session.start(asset)
-            for (attempt in 1..40) {
-                try {
-                    client.connect(LocalSocketAddress("scrcpy_$scid", LocalSocketAddress.Namespace.ABSTRACT))
-                    break
-                } catch (error: IOException) {
-                    if (attempt == 40) throw error
-                    delay(100)
-                }
-            }
-            client.soTimeout = 5000
-            DataInputStream(BufferedInputStream(client.inputStream)).use { input ->
+            val stream = tunnel.open(port, scid)
+            DataInputStream(BufferedInputStream(stream)).use { input ->
                 decode(input, target)
             }
         } finally {
-            runCatching { client.close() }
-            socket = null
+            tunnel.close()
+            videoTunnel = null
             withContext(NonCancellable) {
                 runCatching { session.close() }.onFailure {
                     AppLog.add("SCRCPY", "Unable to clean up ADB server: ${it.javaClass.simpleName}")
@@ -133,7 +124,9 @@ class ScrcpyMirrorService : Service() {
     }
 
     private suspend fun decode(input: DataInputStream, target: CarTarget) {
-        val header = ScrcpyWire.readHeader(input)
+        val header = withTimeoutOrNull(5_000) {
+            runInterruptible(Dispatchers.IO) { ScrcpyWire.readHeader(input) }
+        } ?: error("Timed out waiting for the scrcpy video header")
         AppLog.add("SCRCPY", "H264 stream ${header.width}x${header.height}")
         val mediaFormat = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, header.width, header.height)
         val codec = MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
@@ -143,7 +136,7 @@ class ScrcpyMirrorService : Service() {
             val info = MediaCodec.BufferInfo()
             var rendered = false
             while (currentCoroutineContext().isActive && MirrorGateway.surface.value?.surface === target.surface) {
-                val packet = ScrcpyWire.readPacket(input)
+                val packet = runInterruptible(Dispatchers.IO) { ScrcpyWire.readPacket(input) }
                 val index = codec.dequeueInputBuffer(20_000L)
                 if (index >= 0) {
                     val buffer = codec.getInputBuffer(index) ?: error("Missing decoder buffer")
@@ -179,7 +172,9 @@ class ScrcpyMirrorService : Service() {
 
     override fun onDestroy() {
         job?.cancel()
-        runCatching { socket?.close() }
+        videoTunnel?.let { tunnel ->
+            scope.launch(NonCancellable + Dispatchers.IO) { tunnel.close() }
+        }
         scope.cancel()
         MirrorGateway.captureStopped()
         stopForeground(STOP_FOREGROUND_REMOVE)

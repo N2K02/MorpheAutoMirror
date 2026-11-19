@@ -50,6 +50,7 @@ dependencies {
     implementation("androidx.car.app:app-projected:1.7.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
     implementation("dev.n2k02:adb-core:0.1.8")
+    implementation("com.github.MuntashirAkon:libadb-android:3.1.1")
     implementation("org.bouncycastle:bcpkix-jdk15to18:1.83")
     testImplementation("junit:junit:4.13.2")
 }
