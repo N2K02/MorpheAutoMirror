@@ -134,7 +134,6 @@ jobs:
           fi
       - name: Resolve mRadio-compatible release version and notes
         if: env.SIGNING_READY == 'true'
-        env:
         run: |
           set -euo pipefail
           python3 .github/scripts/version_code.py --self-test
