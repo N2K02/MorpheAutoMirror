@@ -1,0 +1,4 @@
+<network-security-config>
+    <!-- The direct renderer has no loopback HTTP server. -->
+    <base-config cleartextTrafficPermitted="false"/>
+</network-security-config>
