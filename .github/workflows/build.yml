@@ -65,7 +65,7 @@ jobs:
   release:
     needs: verify
     runs-on: ubuntu-latest
-    if: (github.event_name == 'pull_request' && !github.event.pull_request.draft) || (github.event_name == 'pull_request_target' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main-adb')
+    if: github.event_name == 'pull_request' || (github.event_name == 'pull_request_target' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main-adb')
     env:
       N2K02_PACKAGES_TOKEN: ${{ secrets.N2K02_PACKAGES_TOKEN }}
       SIGNING_PASSPHRASE: ${{ secrets.SIGNING_PASSPHRASE }}
@@ -195,7 +195,7 @@ jobs:
           path: ${{ env.APK_NAME }}.apk
           retention-days: 30
       - name: Publish experimental prerelease or stable release
-        if: env.SIGNING_READY == 'true'
+        if: env.SIGNING_READY == 'true' && !github.event.pull_request.draft
         run: |
           set -euo pipefail
           if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then

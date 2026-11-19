@@ -4,7 +4,7 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        maven { url = uri("https://jitpack.io"); content { includeGroup("com.github.MuntashirAkon") } }
+        maven { url = uri("https://jitpack.io"); content { includeGroupAndSubgroups("com.github.MuntashirAkon") } }
         val token = providers.environmentVariable("N2K02_PACKAGES_TOKEN").orNull
         if (!token.isNullOrBlank()) {
             maven {
