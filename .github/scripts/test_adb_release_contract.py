@@ -10,9 +10,9 @@ class AdbReleaseContractTest(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/build.yml").read_text()
         release = workflow.split("\n  release:\n", 1)[1]
         self.assertIn("needs: verify", release)
-        self.assertIn("github.event.pull_request.merged == true", release)
-        self.assertIn("github.event.pull_request.base.ref == 'main-adb'", release)
-        self.assertIn("github.event.pull_request.merge_commit_sha", release)
+        self.assertIn("needs: stable-approval", workflow)
+        self.assertIn("branches: [main-adb]", workflow)
+        self.assertIn("require-stable-merge.yml@", workflow)
         self.assertNotIn("workflow_dispatch:", workflow)
 
     def test_experimental_publication_and_updater_match_adb(self):
