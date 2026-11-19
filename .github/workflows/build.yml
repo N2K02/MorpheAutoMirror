@@ -177,6 +177,7 @@ jobs:
           suffix=$(sed -n 's/^VERSION_SUFFIX=//p' "$RUNNER_TEMP/architecture-naming.env")
           echo "APK_NAME=MorpheAutoMirror-SHIZUKU-$base$suffix" >> "$GITHUB_ENV"
       - name: Validate architecture-qualified APK filename
+        if: env.SIGNING_READY == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -239,7 +240,7 @@ jobs:
           if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then TITLE="$EXPERIMENTAL_TITLE"; fi
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
-              gh release upload "$TAG" "$APK_NAME.apk" --repo "$GITHUB_REPOSITORY" --clobber
+              gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -Fxq "$APK_NAME.apk"
             else
               echo "::error::Stable release tag already exists: $TAG"; exit 1
             fi
@@ -247,3 +248,9 @@ jobs:
             gh release create "$TAG" "$APK_NAME.apk" --repo "$GITHUB_REPOSITORY" --target "$TARGET" --title "$TITLE" --notes-file release-notes.md "${EXTRA[@]}"
           fi
 
+  download-index:
+    needs: release
+    if: github.event_name == 'pull_request_target' || (github.event_name == 'pull_request' && !github.event.pull_request.draft)
+    permissions:
+      contents: write
+    uses: N2K02/n2k02updater/.github/workflows/index-downloads.yml@ae58c3ce0196b1b30d214927dd529ce5d779febf
