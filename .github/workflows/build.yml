@@ -3,16 +3,8 @@ on:
   pull_request:
     branches: [main-shizuku]
     types: [opened, synchronize, reopened]
-  pull_request_target:
-    types: [closed]
   push:
     branches: [main-shizuku]
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Optional next stable version, e.g. 1.2'
-        required: false
-        default: ''
 env:
   APP: MorpheAutoMirror
   RELEASE_TRACK: shizuku
@@ -22,15 +14,21 @@ concurrency:
   group: morphe-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  stable-approval:
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: N2K02/n2k02updater/.github/workflows/require-stable-merge.yml@cfbb69f4ac19cf6b24aea96f82cadf2144c29635
   verify:
-    if: (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || (github.event_name == 'pull_request_target' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main-shizuku') || github.event_name == 'push'
+    needs: stable-approval
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     env:
       N2K02_PACKAGES_TOKEN: ${{ secrets.N2K02_PACKAGES_TOKEN }}
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.merge_commit_sha || github.sha }}
+          ref: ${{ github.sha }}
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
@@ -76,7 +74,7 @@ jobs:
   release:
     needs: verify
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || (github.event_name == 'pull_request_target' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main-shizuku')
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
     env:
       N2K02_PACKAGES_TOKEN: ${{ secrets.N2K02_PACKAGES_TOKEN }}
       SIGNING_PASSPHRASE: ${{ secrets.SIGNING_PASSPHRASE }}
@@ -85,7 +83,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.merge_commit_sha || github.sha }}
+          ref: ${{ github.sha }}
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
@@ -250,7 +248,7 @@ jobs:
 
   download-index:
     needs: release
-    if: github.event_name == 'pull_request_target' || (github.event_name == 'pull_request' && !github.event.pull_request.draft)
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
     permissions:
       contents: write
     uses: N2K02/n2k02updater/.github/workflows/index-downloads.yml@ae58c3ce0196b1b30d214927dd529ce5d779febf
